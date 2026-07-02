@@ -1,0 +1,548 @@
+<!--
+  Copyright 2026 Shaun Murphy and Charles Murphy
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azimuth Stern Drive (ASD) Boat Simulator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <div class="brand">
+            <div class="logo-icon">
+                <!-- Simple Boat Icon SVG -->
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M22 10a6 6 0 0 1-5.1 5.9l-.9.1H8l-.9-.1A6 6 0 0 1 2 10V4h20v6Z"/>
+                    <path d="M12 22V15"/>
+                    <path d="m9 18 3 4 3-4"/>
+                </svg>
+            </div>
+            <h1>ASD Boat Drive Simulator</h1>
+            <span>Microprocessor Mixed</span>
+        </div>
+        <div class="controls-header">
+            <button id="btnThemeToggle" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; outline: none; transition: background 0.2s;">
+                <svg id="themeMoonIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg id="themeSunIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <span id="txtTheme">Dark Mode</span>
+            </button>
+            <button id="btnReset" class="danger">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M16 3h5v5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 21H3v-5"/></svg>
+                Reset Position
+            </button>
+            <button id="btnObstacles" class="primary">
+                Toggle Obstacles
+            </button>
+        </div>
+    </header>
+
+    <div class="dashboard">
+        <!-- LEFT PANEL: Configurator -->
+        <aside class="panel">
+            <div class="panel-header">
+                <h2>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    Settings
+                </h2>
+            </div>
+            <div class="panel-content">
+                <!-- Controller Mixing settings -->
+                <section class="config-group">
+                    <div class="widget-title">Microprocessor Configuration</div>
+                    
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Servo Speed Limit <span class="help-tooltip tooltip-bottom" data-tooltip="Sets the rotational speed limit of the steering servo motors in degrees per second. Slower speed limit models hardware transit delays.">?</span></span>
+                            <span class="label-value" id="valServoSpeed">360°/s</span>
+                        </div>
+                        <input type="range" id="slideServoSpeed" min="60" max="720" step="30" value="360">
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Max Toe-In Angle <span class="help-tooltip" data-tooltip="Defines the maximum angle that steering pods can toe inward to stabilize low-speed vessel tracking.">?</span></span>
+                            <span class="label-value" id="valToeIn">45°</span>
+                        </div>
+                        <input type="range" id="slideToeIn" min="0" max="90" step="5" value="45">
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">ESC Motor Response Lag <span class="help-tooltip" data-tooltip="Simulates electric speed controller and propeller spin-up inertia delay in seconds.">?</span></span>
+                            <span class="label-value" id="valMotorLag">0.15s</span>
+                        </div>
+                        <input type="range" id="slideMotorLag" min="0.0" max="1.0" step="0.05" value="0.15">
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row" style="display: flex; justify-content: space-between; align-items: center;">
+                            <span class="label-text">Control Mixing Mode <span class="help-tooltip" data-tooltip="Selects the mathematical control algorithm that maps joystick inputs to steering gimbals and motor throttle outputs.">?</span></span>
+                            <div style="display: flex; gap: 6px;">
+                                <button id="btnNewAlgo" style="background: rgba(10, 132, 255, 0.15); border: 1px solid rgba(10, 132, 255, 0.3); color: #0a84ff; padding: 2px 6px; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 3px; outline: none; transition: background 0.2s;">
+                                    + New
+                                </button>
+                                <button id="btnEditAlgo" style="background: rgba(255, 159, 10, 0.15); border: 1px solid rgba(255, 159, 10, 0.3); color: #ff9f0a; padding: 2px 6px; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 10px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 3px; outline: none; transition: background 0.2s;">
+                                    Edit
+                                </button>
+                                <button id="btnDeleteAlgo" style="background: rgba(255, 69, 58, 0.15); border: 1px solid rgba(255, 69, 58, 0.3); color: #ff453a; padding: 2px 6px; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 10px; font-weight: 600; cursor: pointer; display: none; align-items: center; gap: 3px; outline: none; transition: background 0.2s;">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                        <select id="selectAlgorithm" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12px; font-weight: 500; outline: none; cursor: pointer; width: 100%;">
+                            <option value="vectored">ASD Vectored (Vectored + Diff)</option>
+                            <option value="differential">ASD Differential (Longitudinal Only)</option>
+                        </select>
+                    </div>
+
+                    <div class="switch-row" style="margin-top: 5px;">
+                        <span class="switch-label">Invert Steering Direction <span class="help-tooltip" data-tooltip="Inverts the yaw steering direction. When enabled, left stick inputs turn the boat clockwise.">?</span></span>
+                        <label class="switch">
+                            <input type="checkbox" id="checkInvertSteer">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="config-group" id="groupTransWeight">
+                        <div class="config-label-row">
+                            <span class="label-text">Translation Weight <span class="help-tooltip" data-tooltip="Translation weight factor for the mixing algorithm. Controls the ratio of joystick lateral thrust.">?</span></span>
+                            <span class="label-value" id="valTransWeight">1.0</span>
+                        </div>
+                        <input type="range" id="slideTransWeight" min="0.0" max="1.5" step="0.05" value="1.0">
+                    </div>
+
+                    <div class="config-group" id="groupRotWeight">
+                        <div class="config-label-row">
+                            <span class="label-text">Rotation Weight <span class="help-tooltip" data-tooltip="Yaw torque weight factor. Adjusts how aggressively the boat spins on its axis in response to joystick twist.">?</span></span>
+                            <span class="label-value" id="valRotWeight">0.8</span>
+                        </div>
+                        <input type="range" id="slideRotWeight" min="0.0" max="1.5" step="0.05" value="0.8">
+                    </div>
+
+                    <div class="config-group" id="groupLatWeight">
+                        <div class="config-label-row">
+                            <span class="label-text">Lateral Vectored Weight <span class="help-tooltip" data-tooltip="Lateral translation weight factor. Sets the proportion of pure sideways slide capability.">?</span></span>
+                            <span class="label-value" id="valLatWeight">0.7</span>
+                        </div>
+                        <input type="range" id="slideLatWeight" min="0.0" max="1.5" step="0.05" value="0.7">
+                    </div>
+                </section>
+
+                <!-- Physics Settings -->
+                <section class="config-group">
+                    <div class="widget-title">Boat Physics Parameters</div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Boat Mass <span class="help-tooltip" data-tooltip="Total mass of the vessel in kilograms. Higher mass increases inertia, momentum, and coasting distance.">?</span></span>
+                            <span class="label-value" id="valMass">4.5 kg</span>
+                        </div>
+                        <input type="range" id="slideMass" min="1.0" max="15.0" step="0.5" value="4.5">
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Max Thrust (Each Pod) <span class="help-tooltip" data-tooltip="Maximum propulsion force of each azimuth thruster pod in Newtons. Directly affects acceleration and top speed.">?</span></span>
+                            <span class="label-value" id="valThrust">8.0 N</span>
+                        </div>
+                        <input type="range" id="slideThrust" min="2.0" max="25.0" step="0.5" value="8.0">
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Hull Lateral Drag <span class="help-tooltip" data-tooltip="Water friction opposing sideways slide movements. Higher drag stabilizes tracking but reduces lateral drift.">?</span></span>
+                            <span class="label-value" id="valLateralDrag">18.0</span>
+                        </div>
+                        <input type="range" id="slideLateralDrag" min="5.0" max="40.0" step="1.0" value="18.0">
+                    </div>
+                </section>
+
+                <!-- Environment Controls -->
+                <section class="config-group">
+                    <div class="widget-title">Environment & Forces</div>
+                    
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Water Current Speed <span class="help-tooltip" data-tooltip="Velocity of the water current (tide) in meters per second. Constant drift force applied to the hull.">?</span></span>
+                            <span class="label-value" id="valCurrentSpeed">0.0 m/s</span>
+                        </div>
+                        <input type="range" id="slideCurrentSpeed" min="0.0" max="2.0" step="0.1" value="0.0">
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Current Direction <span class="help-tooltip" data-tooltip="Compass direction of the water current (0 degrees is North, 90 degrees is East).">?</span></span>
+                            <span class="label-value" id="valCurrentDir">0°</span>
+                        </div>
+                        <input type="range" id="slideCurrentDir" min="0" max="355" step="5" value="0">
+                    </div>
+
+                    <div style="display: flex; gap: 15px; justify-content: space-around; align-items: center; margin-top: 5px;">
+                        <div class="stat-item">
+                            <span class="stat-unit" style="font-size: 8px;">Current Vector</span>
+                            <div class="compass-ring">
+                                <div class="compass-arrow" id="compassCurrent"></div>
+                            </div>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-unit" style="font-size: 8px;">Wind Vector</span>
+                            <div class="compass-ring">
+                                <div class="compass-arrow wind" id="compassWind"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Wind Speed Force <span class="help-tooltip" data-tooltip="Velocity of the wind in meters per second. Constant wind drag pressure force acting on the superstructure.">?</span></span>
+                            <span class="label-value" id="valWindSpeed">0.0 m/s</span>
+                        </div>
+                        <input type="range" id="slideWindSpeed" min="0.0" max="3.0" step="0.1" value="0.0">
+                    </div>
+
+                    <div class="config-group">
+                        <div class="config-label-row">
+                            <span class="label-text">Wind Direction <span class="help-tooltip" data-tooltip="Compass direction of the wind (0 degrees is North, 90 degrees is East).">?</span></span>
+                            <span class="label-value" id="valWindDir">90°</span>
+                        </div>
+                        <input type="range" id="slideWindDir" min="0" max="355" step="5" value="90">
+                    </div>
+                </section>
+
+                <!-- View & Overlay Settings -->
+                <section class="config-group">
+                    <div class="widget-title">View & Overlay Settings</div>
+                    
+                    <div class="config-group" style="margin: 0; padding-bottom: 5px; margin-top: 5px;">
+                        <div class="config-label-row">
+                            <span class="label-text" style="font-size: 11px;">Map Zoom <span class="help-tooltip" data-tooltip="Scales the main simulation lake view display. Higher values zoom in close; lower values zoom out.">?</span></span>
+                            <span class="label-value" id="valMapZoom" style="font-size: 11px;">35 px/m</span>
+                        </div>
+                        <input type="range" id="slideMapZoom" min="10" max="100" step="5" value="35" style="height: 4px;">
+                    </div>
+
+                    <div class="switch-row" style="margin-top: 5px;">
+                        <span class="switch-label">Show Boat Outline Overlay <span class="help-tooltip" data-tooltip="Toggles visual boat outline overlays centered around the thruster pivot points on both views.">?</span></span>
+                        <label class="switch">
+                            <input type="checkbox" id="checkBoatOverlay" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="groupBoatOverlayConfig" style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); padding: 10px; border-radius: var(--radius-md);">
+                        <div class="config-group" style="margin: 0; padding-bottom: 5px;">
+                            <div class="config-label-row">
+                                <span class="label-text" style="font-size: 11px;">Overlay Transparency <span class="help-tooltip" data-tooltip="Adjusts overlay line visibility. 0% is solid lines, 100% is completely invisible.">?</span></span>
+                                <span class="label-value" id="valOverlayOpacity" style="font-size: 11px;">30%</span>
+                            </div>
+                            <input type="range" id="slideOverlayOpacity" min="5" max="100" step="5" value="30" style="height: 4px;">
+                        </div>
+                        <div class="config-group" style="margin: 0;">
+                            <div class="config-label-row">
+                                <span class="label-text" style="font-size: 11px;">Overlay Size Scale <span class="help-tooltip" data-tooltip="Multiplication factor to resize the transparent boat safety contour overlays (from 0.5x to 2.0x).">?</span></span>
+                                <span class="label-value" id="valOverlayScale" style="font-size: 11px;">1.0x</span>
+                            </div>
+                            <input type="range" id="slideOverlayScale" min="0.5" max="2.0" step="0.1" value="1.0" style="height: 4px;">
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </aside>
+
+        <!-- CENTER AREA: Simulation Viewport & RC Controller -->
+        <main class="simulation-container">
+            <!-- Canvas Viewport -->
+            <div class="canvas-wrapper">
+                <canvas id="simulationCanvas"></canvas>
+                
+                <!-- Overlay details -->
+                <div class="canvas-overlay-nav">
+                    <div class="canvas-badge active">Simulation Live</div>
+                    <div class="canvas-badge" id="badgeFPS">60 FPS</div>
+                </div>
+
+                <div class="canvas-overlay-instructions">
+                    Controls:<br>
+                    - Drag <b>RC Joystick</b> with mouse/touch<br>
+                    - Or use <b>WASD / Arrow Keys</b> (returns to center automatically)<br>
+                    - Toggle obstacles to practice precision docking!
+                </div>
+
+                <div class="zoom-controls">
+                    <button id="btnZoomIn" title="Zoom In">+</button>
+                    <button id="btnZoomOut" title="Zoom Out">&minus;</button>
+                </div>
+            </div>
+
+            <!-- RC Controller & Stats bar -->
+            <div class="panel controller-dock">
+                <!-- 1. RC Transmitter Gimbal -->
+                <div class="rc-transmitter-body">
+                    <div class="rc-antenna"></div>
+                    <div class="rc-logo">Transmitter</div>
+                    <div class="gimbal-well" id="gimbalWell">
+                        <div class="gimbal-crosshair"></div>
+                        <div class="gimbal-stick" id="gimbalStick"></div>
+                    </div>
+                </div>
+
+                <!-- 2. Diagnostics Readouts -->
+                <div class="controller-readouts">
+                    <div class="readout-card active" id="cardCh1">
+                        <span class="readout-title">CH1: Steering (Yaw)</span>
+                        <div class="readout-value" id="txtCh1">1500 <span>&mu;s</span></div>
+                    </div>
+                    <div class="readout-card active" id="cardCh2">
+                        <span class="readout-title">CH2: Throttle (Speed)</span>
+                        <div class="readout-value" id="txtCh2">1500 <span>&mu;s</span></div>
+                    </div>
+                </div>
+
+                <!-- 3. Dynamic Stats -->
+                <div class="dashboard-stats">
+                    <div class="stat-item">
+                        <span class="stat-val" id="statSpeed">0.00</span>
+                        <span class="stat-unit">Speed (m/s)</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-val" id="statHeading">0°</span>
+                        <span class="stat-unit">Heading</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-val" id="statTurn">0.00</span>
+                        <span class="stat-unit">Yaw Rate (°/s)</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- RIGHT PANEL: Microprocessor Output & Code -->
+        <aside class="panel">
+            <div class="tab-container">
+                <button class="tab-btn active" id="tabDiagnostics">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m18.7 8-5.1 5.2-2.8-2.7L7 14.3"/></svg>
+                    Diagnostics
+                </button>
+                <button class="tab-btn" id="tabCode">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                    Code
+                </button>
+            </div>
+
+            <div class="panel-content" id="panelDiagnostics" style="display: flex;">
+                <!-- Left Thruster Output -->
+                <div class="diagnostic-widget">
+                    <div class="widget-title">
+                        <span>Left Thruster Pod</span>
+                        <span style="color: var(--text-secondary); font-size: 10px; font-weight: normal; text-transform: none; letter-spacing: 0;">Port Side</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Servo Angle <span class="help-tooltip tooltip-bottom" data-tooltip="The current resolved physical steering angle of the thruster pod in degrees.">?</span></span>
+                        <span class="widget-row-val cyan" id="diagServoLAngle">0.0°</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Servo PWM <span class="help-tooltip tooltip-bottom" data-tooltip="The raw microsecond (µs) command Command sent to the steering servo motor (1000µs to 2000µs, centered at 1500µs).">?</span></span>
+                        <span class="widget-row-val" id="diagServoLPWM">1500 &mu;s</span>
+                    </div>
+                    <div class="pwm-bar-bg">
+                        <div class="pwm-bar-fill left" id="barServoL" style="width: 50%;"></div>
+                    </div>
+                    
+                    <div style="text-align: center; margin: 10px 0;">
+                        <canvas id="canvasThrusterL" class="thruster-dial" width="130" height="130"></canvas>
+                    </div>
+
+                    <div class="widget-row">
+                        <span class="widget-row-label">Motor Speed <span class="help-tooltip" data-tooltip="The current propeller rotational speed as a percentage of maximum RPM.">?</span></span>
+                        <span class="widget-row-val cyan" id="diagEscLSpeed">0%</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">ESC PWM <span class="help-tooltip" data-tooltip="The raw microsecond (µs) command sent to the electronic speed controller (1000µs for neutral/stop, up to 2000µs for full throttle).">?</span></span>
+                        <span class="widget-row-val" id="diagEscLPWM">1000 &mu;s</span>
+                    </div>
+                    <div class="pwm-bar-bg">
+                        <div class="pwm-bar-fill left" id="barEscL" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Right Thruster Output -->
+                <div class="diagnostic-widget">
+                    <div class="widget-title">
+                        <span>Right Thruster Pod</span>
+                        <span style="color: var(--text-secondary); font-size: 10px; font-weight: normal; text-transform: none; letter-spacing: 0;">Starboard Side</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Servo Angle <span class="help-tooltip tooltip-bottom" data-tooltip="The current resolved physical steering angle of the thruster pod in degrees.">?</span></span>
+                        <span class="widget-row-val cyan" id="diagServoRAngle">0.0°</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Servo PWM <span class="help-tooltip tooltip-bottom" data-tooltip="The raw microsecond (µs) command Command sent to the steering servo motor (1000µs to 2000µs, centered at 1500µs).">?</span></span>
+                        <span class="widget-row-val" id="diagServoRPWM">1500 &mu;s</span>
+                    </div>
+                    <div class="pwm-bar-bg">
+                        <div class="pwm-bar-fill right" id="barServoR" style="width: 50%;"></div>
+                    </div>
+
+                    <div style="text-align: center; margin: 10px 0;">
+                        <canvas id="canvasThrusterR" class="thruster-dial" width="130" height="130"></canvas>
+                    </div>
+
+                    <div class="widget-row">
+                        <span class="widget-row-label">Motor Speed <span class="help-tooltip" data-tooltip="The current propeller rotational speed as a percentage of maximum RPM.">?</span></span>
+                        <span class="widget-row-val cyan" id="diagEscRSpeed">0%</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">ESC PWM <span class="help-tooltip" data-tooltip="The raw microsecond (µs) command sent to the electronic speed controller (1000µs for neutral/stop, up to 2000µs for full throttle).">?</span></span>
+                        <span class="widget-row-val" id="diagEscRPWM">1000 &mu;s</span>
+                    </div>
+                    <div class="pwm-bar-bg">
+                        <div class="pwm-bar-fill right" id="barEscR" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <!-- Vector calculations -->
+                <div class="diagnostic-widget">
+                    <div class="widget-title">Vector Calculations</div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Target Angle L <span class="help-tooltip" data-tooltip="The raw steering angle target calculated by the mixing algorithm before servo speed limiters are applied.">?</span></span>
+                        <span class="widget-row-val" id="diagTargetAngleL">0.0°</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Target Angle R <span class="help-tooltip" data-tooltip="The raw steering angle target calculated by the mixing algorithm before servo speed limiters are applied.">?</span></span>
+                        <span class="widget-row-val" id="diagTargetAngleR">0.0°</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Target Speed L <span class="help-tooltip" data-tooltip="The raw motor throttle speed target calculated by the mixing algorithm before acceleration limiters.">?</span></span>
+                        <span class="widget-row-val" id="diagTargetSpeedL">0%</span>
+                    </div>
+                    <div class="widget-row">
+                        <span class="widget-row-label">Target Speed R <span class="help-tooltip" data-tooltip="The raw motor throttle speed target calculated by the mixing algorithm before acceleration limiters.">?</span></span>
+                        <span class="widget-row-val" id="diagTargetSpeedR">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Microcontroller Code Panel -->
+            <div class="panel-content" id="panelCode" style="display: none; padding: 15px; flex-direction: column; gap: 10px; height: 100%;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Target Platform</span>
+                    <select id="selectPlatform" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 5px 10px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 11px; outline: none; cursor: pointer;">
+                        <option value="arduino">Arduino Uno (AVR)</option>
+                        <option value="esp32">ESP32 (WROOM-32)</option>
+                    </select>
+                </div>
+                <div class="code-viewer" id="codeText" style="flex: 1; margin: 0; height: calc(100% - 30px);"></div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Custom Mixing Mode Editor Modal -->
+    <div id="modalEditor" class="modal-backdrop">
+        <div class="modal-box" style="width: 750px;">
+            <div class="modal-header">
+                <span id="editorTitle" style="font-size: 16px; font-weight: 600; color: var(--text-primary);">Create Custom Mixing Algorithm</span>
+                <span id="closeEditor" style="cursor: pointer; color: var(--text-secondary); font-size: 20px; line-height: 1;">&times;</span>
+            </div>
+            
+            <div class="modal-body" style="flex-direction: row; gap: 20px; align-items: stretch; max-height: 75vh; overflow-y: auto;">
+                <!-- Left: Equation Inputs (Flex 1.2) -->
+                <div style="flex: 1.2; display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Algorithm Name</span>
+                        <input type="text" id="editorName" placeholder="e.g. My Custom Vector Mix" class="modal-input">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Left Servo Target Angle (radians)</span>
+                        <input type="text" id="editorEqServoL" placeholder="e.g. x * 30 * pi / 180 - toeangle" class="modal-input" style="font-family: var(--font-mono); font-size: 12px;">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Right Servo Target Angle (radians)</span>
+                        <input type="text" id="editorEqServoR" placeholder="e.g. x * 30 * pi / 180 + toeangle" class="modal-input" style="font-family: var(--font-mono); font-size: 12px;">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Left Motor Speed Target [-1.0 to 1.0]</span>
+                        <input type="text" id="editorEqEscL" placeholder="e.g. y + x * 0.3" class="modal-input" style="font-family: var(--font-mono); font-size: 12px;">
+                    </div>
+
+                    <div style="display: flex; flex-direction: column; gap: 4px;">
+                        <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">Right Motor Speed Target [-1.0 to 1.0]</span>
+                        <input type="text" id="editorEqEscR" placeholder="e.g. y - x * 0.3" class="modal-input" style="font-family: var(--font-mono); font-size: 12px;">
+                    </div>
+
+                    <div id="editorError" style="display: none; background: rgba(255, 69, 58, 0.1); border: 1px solid rgba(255, 69, 58, 0.2); border-radius: var(--radius-md); padding: 10px 14px; font-size: 12px; font-family: var(--font-sans); color: #ff453a;">
+                    </div>
+                </div>
+
+                <!-- Right: Safe Reference Guide (Flex 0.8) -->
+                <div class="modal-guide">
+                    <div style="font-weight: 600; font-size: 12px; color: var(--text-primary); text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px; margin-bottom: 4px;">Reference Guide</div>
+                    
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">VARIABLES:</div>
+                        <ul style="padding-left: 12px; margin: 0; display: flex; flex-direction: column; gap: 3px;">
+                            <li><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">x</strong> : Joystick steering (-1.0 = left, 1.0 = right)</li>
+                            <li><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">y</strong> : Joystick throttle (-1.0 = reverse, 1.0 = forward)</li>
+                            <li><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">toeangle</strong> : Active maximum toe-in angle (radians)</li>
+                            <li><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">transweight</strong> : Translation mixing weight</li>
+                            <li><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">rotweight</strong> : Yaw rotation mixing weight</li>
+                            <li><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">latweight</strong> : Sideways lateral mixing weight</li>
+                            <li><strong style="color: var(--accent-cyan); font-family: var(--font-mono);">pi</strong> : Math constant &pi;</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">OPERATORS:</div>
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); background: rgba(255,255,255,0.04); padding: 2px 5px; border-radius: var(--radius-sm); font-size: 10px;">+</span>
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); background: rgba(255,255,255,0.04); padding: 2px 5px; border-radius: var(--radius-sm); font-size: 10px;">-</span>
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); background: rgba(255,255,255,0.04); padding: 2px 5px; border-radius: var(--radius-sm); font-size: 10px;">*</span>
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); background: rgba(255,255,255,0.04); padding: 2px 5px; border-radius: var(--radius-sm); font-size: 10px;">/</span>
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); background: rgba(255,255,255,0.04); padding: 2px 5px; border-radius: var(--radius-sm); font-size: 10px;">^</span> (pow)
+                        <span style="font-family: var(--font-mono); color: var(--accent-blue); background: rgba(255,255,255,0.04); padding: 2px 5px; border-radius: var(--radius-sm); font-size: 10px;">( )</span>
+                    </div>
+
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 2px;">FUNCTIONS:</div>
+                        <ul style="padding-left: 12px; margin: 0; display: flex; flex-direction: column; gap: 3px; font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">
+                            <li><strong style="color: var(--accent-blue);">sin(a)</strong>, <strong style="color: var(--accent-blue);">cos(a)</strong>, <strong style="color: var(--accent-blue);">tan(a)</strong></li>
+                            <li><strong style="color: var(--accent-blue);">abs(a)</strong> : absolute value</li>
+                            <li><strong style="color: var(--accent-blue);">sqrt(a)</strong> : square root</li>
+                            <li><strong style="color: var(--accent-blue);">min(a,b)</strong> : minimum</li>
+                            <li><strong style="color: var(--accent-blue);">max(a,b)</strong> : maximum</li>
+                        </ul>
+                    </div>
+
+                    <div style="font-size: 10px; background: rgba(10, 132, 255, 0.08); border: 1px solid rgba(10, 132, 255, 0.15); padding: 8px 10px; border-radius: var(--radius-sm); color: #0a84ff; line-height: 1.3;">
+                        🔒 <strong>Safety Validation:</strong> Formulas are compiled to a strict AST tree. Raw JavaScript and global window context execution are disabled.
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button id="btnCancelEditor" class="modal-btn-cancel">Cancel</button>
+                <button id="btnSaveEditor" style="background: var(--accent-blue); border: none; color: #fff; padding: 8px 20px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 13px; font-weight: 600; cursor: pointer; outline: none; transition: filter 0.2s;">Compile & Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Logic script imports -->
+    <script type="module" src="ui.js"></script>
+</body>
+</html>
