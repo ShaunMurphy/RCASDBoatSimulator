@@ -2,6 +2,8 @@
 
 A real-time, browser-based simulator for **2-channel RC (Radio Control) Azimuth Stern Drive (ASD) boats**. This tool visualizes how a twin azimuth thruster boat responds to joystick inputs, helping hobbyists and engineers design, test, and tune control mixing algorithms before deploying them to physical hardware.
 
+### 🌐 [**Try it live → shaunmurphy.github.io/RCASDBoatSimulator**](https://shaunmurphy.github.io/RCASDBoatSimulator/)
+
 **No build tools, frameworks, or dependencies required** — just open `index.html` in a modern browser, or serve it with any static HTTP server.
 
 ## Features
