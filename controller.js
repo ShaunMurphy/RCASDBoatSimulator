@@ -354,6 +354,42 @@ export class ASDController {
                 }
                 return;
             }
+        if (this.config.algorithm === 'crabwalk') {
+            const wTrans = this.config.translationWeight;
+            const wLat = this.config.lateralWeight;
+            const k = 4.2667; // Lever arm ratio -thrusterDistY / thrusterDistX
+            
+            let Ax = (x * wLat) / 2.0;
+            let AyL = (y * wTrans + k * x * wLat) / 2.0;
+            let AyR = (y * wTrans - k * x * wLat) / 2.0;
+            
+            let sL = Math.sqrt(Ax * Ax + AyL * AyL);
+            let sR = Math.sqrt(Ax * Ax + AyR * AyR);
+            
+            const maxS = Math.max(sL, sR);
+            if (maxS > 1.0) {
+                sL /= maxS;
+                sR /= maxS;
+                Ax /= maxS;
+                AyL /= maxS;
+                AyR /= maxS;
+            }
+            
+            this.microOut.escLeftTargetSpeed = sL;
+            this.microOut.escRightTargetSpeed = sR;
+            
+            if (sL > 0.005) {
+                this.microOut.servoLeftTargetAngle = Math.atan2(Ax, AyL);
+            } else {
+                this.microOut.servoLeftTargetAngle = 0.0;
+            }
+            
+            if (sR > 0.005) {
+                this.microOut.servoRightTargetAngle = Math.atan2(Ax, AyR);
+            } else {
+                this.microOut.servoRightTargetAngle = 0.0;
+            }
+            return;
         }
 
         const maxToe = this.config.maxToeIn;

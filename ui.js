@@ -1089,8 +1089,17 @@ function updateDiagnosticsDisplay() {
 
 // Code panel text rendering with syntax highlighting based on active platform and mixing mode
 function renderArduinoCode() {
-    const isVector = selectAlgorithm.value === 'vectored';
     const isESP32 = selectPlatform.value === 'esp32';
+    
+    let modeName = 'ASD Vectored (Vectored + Diff)';
+    if (selectAlgorithm.value === 'differential') {
+        modeName = 'ASD Differential (Longitudinal Only)';
+    } else if (selectAlgorithm.value === 'crabwalk') {
+        modeName = 'ASD Crab Walk (Lateral Translation)';
+    } else if (selectAlgorithm.value.startsWith('custom_')) {
+        const algo = controller.customAlgorithms[selectAlgorithm.value];
+        modeName = algo ? `Custom: ${algo.name}` : 'Custom Algorithm';
+    }
     
     let loopCode = '';
     
@@ -1108,7 +1117,7 @@ function renderArduinoCode() {
   targetSpeedL = ${eqSpeedL};
   targetSpeedR = ${eqSpeedR};`;
         }
-    } else if (isVector) {
+    } else if (selectAlgorithm.value === 'vectored') {
         loopCode = `  // 2. Compute Translation Force Components
   float s_trans = abs(y) * ${slideTransWeight.value};
   float alpha = 0.0;
@@ -1145,6 +1154,31 @@ function renderArduinoCode() {
 
   float targetAngleL = (targetSpeedL > 0.005) ? atan2(fL_x, fL_y) : thetaL_trans;
   float targetAngleR = (targetSpeedR > 0.005) ? atan2(fR_x, fR_y) : thetaR_trans;`;
+    } else if (selectAlgorithm.value === 'crabwalk') {
+        loopCode = `  // 2. Compute Translation Components (Crabwalk Mode)
+  float wTrans = ${slideTransWeight.value};
+  float wLat = ${slideLatWeight.value};
+  float k = 4.2667; // Lever arm ratio -thrusterDistY / thrusterDistX
+
+  float Ax = (x * wLat) / 2.0;
+  float AyL = (y * wTrans + k * x * wLat) / 2.0;
+  float AyR = (y * wTrans - k * x * wLat) / 2.0;
+
+  float targetSpeedL = sqrt(Ax * Ax + AyL * AyL);
+  float targetSpeedR = sqrt(Ax * Ax + AyR * AyR);
+
+  // Scale speeds proportionally if either exceeds 1.0 to preserve zero yaw torque ratio
+  float maxS = max(targetSpeedL, targetSpeedR);
+  if (maxS > 1.0) {
+    targetSpeedL /= maxS;
+    targetSpeedR /= maxS;
+    Ax /= maxS;
+    AyL /= maxS;
+    AyR /= maxS;
+  }
+
+  float targetAngleL = (targetSpeedL > 0.005) ? atan2(Ax, AyL) : 0.0;
+  float targetAngleR = (targetSpeedR > 0.005) ? atan2(Ax, AyR) : 0.0;`;
     } else {
         loopCode = `  // 2. Compute Translation Force Components
   float s_trans = abs(y) * ${slideTransWeight.value};
@@ -1188,7 +1222,7 @@ function renderArduinoCode() {
         code = `
 <span class="code-comment">// ASD Thruster Mixing System for Arduino Uno (AVR)</span>
 <span class="code-comment">// Converts 2 RC channels (Steering, Throttle) to 2 Azimuth Pods</span>
-<span class="code-comment">// Selected Mode: ${isVector ? 'ASD Vectored (Vectored + Diff)' : 'ASD Differential (Longitudinal Only)'}</span>
+<span class="code-comment">// Selected Mode: ${modeName}</span>
 
 #include &lt;Servo.h&gt;
 
@@ -1286,7 +1320,7 @@ ${loopCode}
 <span class="code-comment">// ASD Thruster Mixing System for ESP32 (WROOM-32)</span>
 <span class="code-comment">// Converts 2 RC channels (Steering, Throttle) to 2 Azimuth Pods</span>
 <span class="code-comment">// Uses high-precision hardware interrupts for non-blocking RC pulse reading</span>
-<span class="code-comment">// Selected Mode: ${isVector ? 'ASD Vectored (Vectored + Diff)' : 'ASD Differential (Longitudinal Only)'}</span>
+<span class="code-comment">// Selected Mode: ${modeName}</span>
 
 #include &lt;ESP32Servo.h&gt;
 
