@@ -350,11 +350,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 /* RC Controller Panel (Bottom Center) */
 .controller-dock {
-    height: 190px;
+    height: 205px;
     display: grid;
     grid-template-columns: 180px 1fr 180px;
     gap: 15px;
-    padding: 15px 20px;
+    padding: 10px 20px;
     transition: grid-template-columns var(--transition-medium);
 }
 
@@ -389,7 +389,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
     font-weight: 700;
     color: var(--text-secondary);
     letter-spacing: 1.5px;
-    margin-bottom: 6px;
+    margin-top: 0px;
+    margin-bottom: 3px;
     text-transform: uppercase;
 }
 
@@ -1583,4 +1584,18 @@ body.light-theme .target-card-row input[type="range"] {
 }
 body.light-theme .target-card-row input[type="range"]::-webkit-slider-thumb {
     background: #000000;
+}
+
+/* 2x2 Telemetry Grid for 4-Channel mode */
+.controller-readouts.grid-2x2 {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    grid-gap: 5px !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+}
+
+.controller-readouts.grid-2x2 .readout-card {
+    min-width: 0 !important; /* allow shrinking inside grid */
+    padding: 6px 8px !important;
 }

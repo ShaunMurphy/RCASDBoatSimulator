@@ -123,6 +123,7 @@ const btnTargetEngineToggle = document.getElementById('btnTargetEngineToggle');
 const btnTargetTowToggle = document.getElementById('btnTargetTowToggle');
 const targetEngineLight = document.getElementById('targetEngineLight');
 const targetEngineText = document.getElementById('targetEngineText');
+const controllerReadouts = document.getElementById('controllerReadouts');
 
 // Target Ship Physics Settings Selectors
 const checkTugMode = document.getElementById('checkTugMode');
@@ -260,6 +261,10 @@ function applyConfig() {
     // Show/hide Ch3/Ch4 readout cards
     cardCh3.style.display = is4ch ? 'flex' : 'none';
     cardCh4.style.display = is4ch ? 'flex' : 'none';
+
+    if (controllerReadouts) {
+        controllerReadouts.classList.toggle('grid-2x2', is4ch);
+    }
 
     // If switching back to 2ch, reset left stick inputs to center (1500us)
     if (!is4ch) {
