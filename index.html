@@ -286,6 +286,45 @@
                             <input type="range" id="slideOverlayScale" min="0.5" max="2.0" step="0.1" value="1.0" style="height: 4px;">
                         </div>
                     </div>
+
+                    <div class="switch-row" style="margin-top: 10px;">
+                        <span class="switch-label">Practice Tug Mode <span class="help-tooltip" data-tooltip="Spawns a target cargo vessel to practice pushing, towing, and maneuvering with a tow rope.">?</span></span>
+                        <label class="switch">
+                            <input type="checkbox" id="checkTugMode" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="groupTugModeConfig" style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); padding: 10px; border-radius: var(--radius-md);">
+                        <div class="config-group" style="margin: 0; padding-bottom: 5px;">
+                            <div class="config-label-row">
+                                <span class="label-text" style="font-size: 11px;">Target Ship Mass</span>
+                                <span class="label-value" id="valShipMass" style="font-size: 11px;">120 kg</span>
+                            </div>
+                            <input type="range" id="slideShipMass" min="20" max="300" step="10" value="120" style="height: 4px;">
+                        </div>
+                        <div class="config-group" style="margin: 0; padding-bottom: 5px;">
+                            <div class="config-label-row">
+                                <span class="label-text" style="font-size: 11px;">Target Ship Drag</span>
+                                <span class="label-value" id="valShipDrag" style="font-size: 11px;">70</span>
+                            </div>
+                            <input type="range" id="slideShipDrag" min="10" max="200" step="5" value="70" style="height: 4px;">
+                        </div>
+                        <div class="config-group" style="margin: 0; padding-bottom: 5px;">
+                            <div class="config-label-row">
+                                <span class="label-text" style="font-size: 11px;">Target Ship Rotational Drag</span>
+                                <span class="label-value" id="valShipRotDrag" style="font-size: 11px;">60</span>
+                            </div>
+                            <input type="range" id="slideShipRotDrag" min="10" max="200" step="5" value="60" style="height: 4px;">
+                        </div>
+                        <div class="config-group" style="margin: 0;">
+                            <div class="config-label-row">
+                                <span class="label-text" style="font-size: 11px;">Towing Rope Length</span>
+                                <span class="label-value" id="valRopeLength" style="font-size: 11px;">1.6 m</span>
+                            </div>
+                            <input type="range" id="slideRopeLength" min="1.0" max="4.0" step="0.1" value="1.6" style="height: 4px;">
+                        </div>
+                    </div>
                 </section>
             </div>
         </aside>
@@ -300,6 +339,31 @@
                 <div class="canvas-overlay-nav">
                     <div class="canvas-badge active">Simulation Live</div>
                     <div class="canvas-badge" id="badgeFPS">60 FPS</div>
+                </div>
+
+                <!-- Floating Target Ship Controls Overlay -->
+                <div id="targetShipControls" class="target-ship-card">
+                    <div class="target-card-header">
+                        <span style="font-weight: 700; font-size: 10px; color: var(--text-primary);">CONTAINER VESSEL</span>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span id="targetEngineLight" class="status-light running"></span>
+                            <span id="targetEngineText" style="font-size: 8px; font-weight: 600; text-transform: uppercase; color: var(--text-secondary);">Engine Running</span>
+                        </div>
+                    </div>
+                    <div class="target-card-row">
+                        <label>Throttle</label>
+                        <input type="range" id="targetThrottle" min="-100" max="100" value="0">
+                        <span id="targetThrottleVal">0%</span>
+                    </div>
+                    <div class="target-card-row">
+                        <label>Rudder</label>
+                        <input type="range" id="targetRudder" min="-35" max="35" value="0">
+                        <span id="targetRudderVal">0°</span>
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 4px; pointer-events: auto;">
+                        <button id="btnTargetEngineToggle" class="target-btn warning">Kill Engine</button>
+                        <button id="btnTargetTowToggle" class="target-btn primary">Connect Tow</button>
+                    </div>
                 </div>
 
                 <div class="canvas-overlay-instructions">

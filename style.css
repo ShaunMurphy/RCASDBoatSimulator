@@ -1428,3 +1428,159 @@ body.light-theme .wiring-pin {
 body.light-theme .wiring-dot {
     background: #b0b0b5;
 }
+
+/* --- Floating Target Ship Controls Overlay Card --- */
+.target-ship-card {
+    position: absolute;
+    z-index: 10;
+    width: 200px;
+    background: rgba(17, 21, 36, 0.88);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: auto;
+    font-family: var(--font-sans);
+    box-sizing: border-box;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.target-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+}
+
+.status-light {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.status-light.running {
+    background: #30d158;
+    box-shadow: 0 0 4px #30d158;
+}
+.status-light.killed {
+    background: #ff453a;
+    box-shadow: 0 0 4px #ff453a;
+}
+
+.target-card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    color: var(--text-secondary);
+}
+
+.target-card-row label {
+    width: 45px;
+    font-weight: 500;
+}
+
+.target-card-row input[type="range"] {
+    flex: 1;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 1px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.target-card-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: pointer;
+    border: none;
+}
+
+.target-card-row span {
+    width: 32px;
+    text-align: right;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-primary);
+}
+
+.target-btn {
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    font-size: 8px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: white;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+    transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.target-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.target-btn.warning {
+    background: rgba(255, 69, 58, 0.15);
+    border-color: rgba(255, 69, 58, 0.25);
+    color: #ff453a;
+}
+.target-btn.warning:hover {
+    background: rgba(255, 69, 58, 0.25);
+}
+
+.target-btn.warning.active-killed {
+    background: rgba(48, 209, 88, 0.15);
+    border-color: rgba(48, 209, 88, 0.25);
+    color: #30d158;
+}
+.target-btn.warning.active-killed:hover {
+    background: rgba(48, 209, 88, 0.25);
+}
+
+.target-btn.primary {
+    background: rgba(10, 132, 255, 0.15);
+    border-color: rgba(10, 132, 255, 0.25);
+    color: #0a84ff;
+}
+.target-btn.primary:hover {
+    background: rgba(10, 132, 255, 0.25);
+}
+.target-btn.primary.active-tow {
+    background: rgba(255, 159, 10, 0.15);
+    border-color: rgba(255, 159, 10, 0.25);
+    color: #ff9f0a;
+}
+.target-btn.primary.active-tow:hover {
+    background: rgba(255, 159, 10, 0.25);
+}
+
+/* Light Theme Overrides */
+body.light-theme .target-ship-card {
+    background: rgba(245, 245, 247, 0.9);
+    border-color: #d2d2d7;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+    color: #1d1d1f;
+}
+body.light-theme .target-card-header {
+    border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+body.light-theme .target-card-row input[type="range"] {
+    background: rgba(0, 0, 0, 0.12);
+}
+body.light-theme .target-card-row input[type="range"]::-webkit-slider-thumb {
+    background: #000000;
+}

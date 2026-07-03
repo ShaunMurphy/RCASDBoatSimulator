@@ -113,6 +113,29 @@ const statSpeed = document.getElementById('statSpeed');
 const statHeading = document.getElementById('statHeading');
 const statTurn = document.getElementById('statTurn');
 
+// Target Ship Control Elements
+const targetShipControls = document.getElementById('targetShipControls');
+const targetThrottle = document.getElementById('targetThrottle');
+const targetThrottleVal = document.getElementById('targetThrottleVal');
+const targetRudder = document.getElementById('targetRudder');
+const targetRudderVal = document.getElementById('targetRudderVal');
+const btnTargetEngineToggle = document.getElementById('btnTargetEngineToggle');
+const btnTargetTowToggle = document.getElementById('btnTargetTowToggle');
+const targetEngineLight = document.getElementById('targetEngineLight');
+const targetEngineText = document.getElementById('targetEngineText');
+
+// Target Ship Physics Settings Selectors
+const checkTugMode = document.getElementById('checkTugMode');
+const groupTugModeConfig = document.getElementById('groupTugModeConfig');
+const slideShipMass = document.getElementById('slideShipMass');
+const valShipMass = document.getElementById('valShipMass');
+const slideShipDrag = document.getElementById('slideShipDrag');
+const valShipDrag = document.getElementById('valShipDrag');
+const slideShipRotDrag = document.getElementById('slideShipRotDrag');
+const valShipRotDrag = document.getElementById('valShipRotDrag');
+const slideRopeLength = document.getElementById('slideRopeLength');
+const valRopeLength = document.getElementById('valRopeLength');
+
 // Tabs & Right Panels
 const tabDiagnostics = document.getElementById('tabDiagnostics');
 const tabCode = document.getElementById('tabCode');
@@ -297,6 +320,46 @@ function applyConfig() {
         groupBoatOverlayConfig.style.display = 'none';
     }
 
+    // Show/hide Tug Practice Mode configuration
+    const showTug = checkTugMode && checkTugMode.checked;
+    if (groupTugModeConfig) {
+        groupTugModeConfig.style.display = showTug ? 'flex' : 'none';
+    }
+    if (targetShipControls) {
+        targetShipControls.style.display = showTug ? 'flex' : 'none';
+    }
+
+    boat.targetShipActive = showTug;
+
+    if (showTug && boat.targetShip) {
+        const sMass = parseFloat(slideShipMass.value);
+        const sDrag = parseFloat(slideShipDrag.value);
+        const sRotDrag = parseFloat(slideShipRotDrag.value);
+        const rLen = parseFloat(slideRopeLength.value);
+
+        valShipMass.innerText = `${sMass} kg`;
+        valShipDrag.innerText = `${sDrag}`;
+        valShipRotDrag.innerText = `${sRotDrag}`;
+        valRopeLength.innerText = `${rLen} m`;
+
+        boat.targetShip.config.mass = sMass;
+        const L_ship = boat.targetShip.config.length;
+        const W_ship = boat.targetShip.config.width;
+        boat.targetShip.config.inertia = (1/12) * sMass * (L_ship * L_ship + W_ship * W_ship);
+
+        boat.targetShip.config.dragLinearX = sDrag;
+        boat.targetShip.config.dragLinearY = sDrag * 0.17; 
+        boat.targetShip.config.dragAngular = sRotDrag;
+        
+        boat.config.towRopeLength = rLen;
+    } else {
+        boat.towLineAttached = false;
+        if (btnTargetTowToggle) {
+            btnTargetTowToggle.innerText = 'Connect Tow';
+            btnTargetTowToggle.classList.remove('active-tow');
+        }
+    }
+
     // Auto-refresh the dynamic C++ code panel if the tab is active
     if (tabCode && tabCode.classList.contains('active')) {
         renderArduinoCode();
@@ -320,7 +383,11 @@ const sliders = [
     { el: slideCurrentSpeed, val: valCurrentSpeed, suffix: ' m/s' },
     { el: slideCurrentDir, val: valCurrentDir, suffix: '°' },
     { el: slideWindSpeed, val: valWindSpeed, suffix: ' m/s' },
-    { el: slideWindDir, val: valWindDir, suffix: '°' }
+    { el: slideWindDir, val: valWindDir, suffix: '°' },
+    { el: slideShipMass, val: valShipMass, suffix: ' kg' },
+    { el: slideShipDrag, val: valShipDrag, suffix: '' },
+    { el: slideShipRotDrag, val: valShipRotDrag, suffix: '' },
+    { el: slideRopeLength, val: valRopeLength, suffix: ' m' }
 ];
 
 sliders.forEach(slider => {
@@ -333,6 +400,10 @@ sliders.forEach(slider => {
         applyConfig();
     });
 });
+
+if (checkTugMode) {
+    checkTugMode.addEventListener('change', applyConfig);
+}
 
 function updateAlgorithmTooltip() {
     const algo = selectAlgorithm.value;
@@ -494,6 +565,30 @@ btnReset.addEventListener('click', () => {
     boat.reset();
     boatTrail.length = 0;
     particles.length = 0;
+    
+    // Reset target ship DOM elements
+    if (targetThrottle) {
+        targetThrottle.value = 0;
+        targetThrottleVal.innerText = '0%';
+    }
+    if (targetRudder) {
+        targetRudder.value = 0;
+        targetRudderVal.innerText = '0°';
+    }
+    if (btnTargetEngineToggle) {
+        btnTargetEngineToggle.innerText = 'Kill Engine';
+        btnTargetEngineToggle.classList.remove('active-killed');
+    }
+    if (targetEngineLight) {
+        targetEngineLight.className = 'status-light running';
+    }
+    if (targetEngineText) {
+        targetEngineText.innerText = 'Engine Running';
+    }
+    if (btnTargetTowToggle) {
+        btnTargetTowToggle.innerText = 'Connect Tow';
+        btnTargetTowToggle.classList.remove('active-tow');
+    }
 });
 
 btnObstacles.addEventListener('click', () => {
@@ -501,6 +596,55 @@ btnObstacles.addEventListener('click', () => {
     btnObstacles.classList.toggle('primary');
     btnObstacles.classList.toggle('danger');
 });
+
+// Target Ship Controller Listeners
+if (targetThrottle) {
+    targetThrottle.addEventListener('input', (e) => {
+        const valPercent = parseInt(e.target.value);
+        targetThrottleVal.innerText = `${valPercent}%`;
+        boat.targetShip.controls.throttle = valPercent / 100.0;
+    });
+}
+
+if (targetRudder) {
+    targetRudder.addEventListener('input', (e) => {
+        const valDegrees = parseInt(e.target.value);
+        targetRudderVal.innerText = `${valDegrees}°`;
+        boat.targetShip.controls.rudderAngle = (valDegrees * Math.PI) / 180.0;
+    });
+}
+
+if (btnTargetEngineToggle) {
+    btnTargetEngineToggle.addEventListener('click', () => {
+        const current = boat.targetShip.controls.engineKilled;
+        boat.targetShip.controls.engineKilled = !current;
+        
+        if (boat.targetShip.controls.engineKilled) {
+            btnTargetEngineToggle.innerText = 'Start Engine';
+            btnTargetEngineToggle.classList.add('active-killed');
+            targetEngineLight.className = 'status-light killed';
+            targetEngineText.innerText = 'Engine Killed';
+        } else {
+            btnTargetEngineToggle.innerText = 'Kill Engine';
+            btnTargetEngineToggle.classList.remove('active-killed');
+            targetEngineLight.className = 'status-light running';
+            targetEngineText.innerText = 'Engine Running';
+        }
+    });
+}
+
+if (btnTargetTowToggle) {
+    btnTargetTowToggle.addEventListener('click', () => {
+        boat.towLineAttached = !boat.towLineAttached;
+        if (boat.towLineAttached) {
+            btnTargetTowToggle.innerText = 'Release Tow';
+            btnTargetTowToggle.classList.add('active-tow');
+        } else {
+            btnTargetTowToggle.innerText = 'Connect Tow';
+            btnTargetTowToggle.classList.remove('active-tow');
+        }
+    });
+}
 
 // Joystick Drag Logic
 function updateVisualJoystick(normX, normY) {
@@ -988,6 +1132,179 @@ function draw() {
         ctx.fill();
     });
 
+    // F1. Render Target Container Ship
+    if (checkTugMode && checkTugMode.checked && boat.targetShip) {
+        const ship = boat.targetShip;
+        const targetShipX = cx + (ship.state.x - boat.state.x) * scale;
+        const targetShipY = cy - (ship.state.y - boat.state.y) * scale;
+
+        // Position floating HTML controls card next to ship
+        if (targetShipControls) {
+            const cardW = 200;
+            const cardH = 95;
+            const minX = 10;
+            const maxX = canvas.width - cardW - 10;
+            const minY = 10;
+            const maxY = canvas.height - cardH - 10;
+
+            let screenX = targetShipX + 45;
+            let screenY = targetShipY - 95;
+            screenX = Math.max(minX, Math.min(screenX, maxX));
+            screenY = Math.max(minY, Math.min(screenY, maxY));
+
+            targetShipControls.style.left = `${screenX}px`;
+            targetShipControls.style.top = `${screenY}px`;
+        }
+
+        // Draw Ship Propeller wash (under the hull)
+        if (!ship.controls.engineKilled && Math.abs(ship.controls.throttle) > 0.05) {
+            const wakeLen = 0.8 * scale;
+            const wakeSign = ship.controls.throttle > 0 ? 1 : -1;
+            
+            ctx.save();
+            ctx.translate(targetShipX, targetShipY);
+            ctx.rotate(ship.state.phi);
+            
+            const hl = (ship.config.length * scale) / 2;
+            const rudderAngle = ship.controls.rudderAngle;
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+            
+            for (let i = 1; i <= 3; i++) {
+                const distWake = hl + i * (0.22 * scale);
+                const wakeOffX = -Math.sin(rudderAngle) * (i * 4.0 * wakeSign);
+                ctx.beginPath();
+                ctx.arc(wakeOffX, distWake * wakeSign, i * (0.09 * scale), 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.restore();
+        }
+
+        // Draw Target Ship Hull
+        ctx.save();
+        ctx.translate(targetShipX, targetShipY);
+        ctx.rotate(ship.state.phi);
+
+        const sLen = ship.config.length * scale;
+        const sWid = ship.config.width * scale;
+        const hl = sLen / 2;
+        const hw = sWid / 2;
+
+        // Shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+        ctx.shadowBlur = 15;
+        ctx.shadowOffsetY = 6;
+
+        // Hull path (Bow is at -hl, Stern is at hl)
+        ctx.beginPath();
+        ctx.moveTo(0, -hl);
+        ctx.quadraticCurveTo(hw, -hl * 0.9, hw, -hl * 0.7);
+        ctx.lineTo(hw, hl);
+        ctx.lineTo(-hw, hl);
+        ctx.lineTo(-hw, -hl * 0.7);
+        ctx.quadraticCurveTo(-hw, -hl * 0.9, 0, -hl);
+        ctx.closePath();
+
+        ctx.fillStyle = isLightTheme ? '#687391' : '#333a4d';
+        ctx.fill();
+        
+        ctx.shadowBlur = 0; // reset shadow
+
+        ctx.strokeStyle = isLightTheme ? '#3f465c' : '#4f5b7a';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Wood Deck
+        ctx.fillStyle = isLightTheme ? 'rgba(211, 140, 71, 0.08)' : 'rgba(211, 140, 71, 0.04)';
+        ctx.fillRect(-hw * 0.85, -hl * 0.7, sWid * 0.85, sLen * 0.65);
+
+        // Draw Cargo Containers
+        const colors = ['#ff453a', '#ff9f0a', '#0a84ff', '#30d158', '#bf5af2', '#5e6b91'];
+        const colWidth = sWid * 0.22;
+        const colLength = sLen * 0.12;
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+
+        const numRows = 4;
+        const rowGap = 3;
+        const totalGridLength = numRows * colLength + (numRows - 1) * rowGap;
+        const deckCenterY = -hl * 0.1;
+        const gridStartY = deckCenterY - totalGridLength / 2;
+
+        for (let row = 0; row < numRows; row++) {
+            const yPos = gridStartY + row * (colLength + rowGap) + colLength / 2;
+            for (let col = -1; col <= 1; col++) {
+                const xPos = col * (colWidth + 2);
+                const colorIdx = Math.abs(row + col * 3) % colors.length;
+                ctx.fillStyle = colors[colorIdx];
+                ctx.fillRect(xPos - colWidth/2, yPos - colLength/2, colWidth, colLength);
+                ctx.strokeRect(xPos - colWidth/2, yPos - colLength/2, colWidth, colLength);
+            }
+        }
+
+        // Bridge/Cabin at the stern (Y = hl - 0.45 * scale)
+        ctx.fillStyle = isLightTheme ? '#ffffff' : '#222836';
+        ctx.strokeStyle = '#4a577d';
+        ctx.lineWidth = 2;
+        ctx.fillRect(-hw * 0.7, hl - 0.55 * scale, sWid * 0.7, 0.35 * scale);
+        ctx.strokeRect(-hw * 0.7, hl - 0.55 * scale, sWid * 0.7, 0.35 * scale);
+
+        // Bridge Glass
+        ctx.fillStyle = 'rgba(0, 221, 255, 0.4)';
+        ctx.fillRect(-hw * 0.6, hl - 0.5 * scale, sWid * 0.6, 0.08 * scale);
+
+        // Draw Rudder
+        ctx.save();
+        ctx.translate(0, hl);
+        ctx.rotate(ship.controls.rudderAngle);
+        ctx.strokeStyle = '#11131a';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, 0.22 * scale); // extends backwards
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.restore();
+    }
+
+    // F2. Draw Tow Line rope (if connected)
+    if (checkTugMode && checkTugMode.checked && boat.towLineAttached && boat.targetShip) {
+        const L_tug = boat.config.length;
+        const L_ship = boat.targetShip.config.length;
+
+        const [attTugWx, attTugWy] = boat.localToWorld(0, -L_tug/2);
+        const xTugAtt = boat.state.x + attTugWx;
+        const yTugAtt = boat.state.y + attTugWy;
+
+        const cosS = Math.cos(boat.targetShip.state.phi);
+        const sinS = Math.sin(boat.targetShip.state.phi);
+        const attShipWx = L_ship/2 * sinS;
+        const attShipWy = L_ship/2 * cosS;
+        const xShipAtt = boat.targetShip.state.x + attShipWx;
+        const yShipAtt = boat.targetShip.state.y + attShipWy;
+
+        const tAttX = cx + (xTugAtt - boat.state.x) * scale;
+        const tAttY = cy - (yTugAtt - boat.state.y) * scale;
+
+        const sAttX = cx + (xShipAtt - boat.state.x) * scale;
+        const sAttY = cy - (yShipAtt - boat.state.y) * scale;
+
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 2;
+
+        ctx.strokeStyle = '#f5f5f7';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(tAttX, tAttY);
+        ctx.lineTo(sAttX, sAttY);
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
     // F. Draw the Boat Hull in local frame
     ctx.save();
     ctx.translate(cx, cy);
@@ -1001,14 +1318,17 @@ function draw() {
     ctx.shadowBlur = 15;
     ctx.shadowOffsetY = 5;
 
-    // Boat Hull Path (Stern aligned to Y = 0, Bow extending forward to Y = -bLen)
+    const hl = bLen / 2;
+    const hw = bWid / 2;
+
+    // Boat Hull Path (Centered on CG)
     ctx.beginPath();
-    ctx.moveTo(0, -bLen); // Bow
-    ctx.quadraticCurveTo(bWid / 2, -bLen * 0.8, bWid / 2, -bLen * 0.6); // Bow curve right
-    ctx.lineTo(bWid / 2, 0); // Stern right corner
-    ctx.lineTo(-bWid / 2, 0); // Stern left corner
-    ctx.lineTo(-bWid / 2, -bLen * 0.6); // Bow straight left
-    ctx.quadraticCurveTo(-bWid / 2, -bLen * 0.8, 0, -bLen); // Bow curve left
+    ctx.moveTo(0, -hl); // Bow
+    ctx.quadraticCurveTo(hw, -bLen * 0.3, hw, -bLen * 0.1); // Bow curve right
+    ctx.lineTo(hw, hl); // Stern right corner
+    ctx.lineTo(-hw, hl); // Stern left corner
+    ctx.lineTo(-hw, -bLen * 0.1); // Bow straight left
+    ctx.quadraticCurveTo(-hw, -bLen * 0.3, 0, -hl); // Bow curve left
     ctx.closePath();
 
     ctx.fillStyle = '#1c2237';
@@ -1031,12 +1351,12 @@ function draw() {
         ctx.strokeStyle = isLightTheme ? `rgba(0, 113, 227, ${opacity})` : `rgba(0, 221, 255, ${opacity})`;
         ctx.lineWidth = 2.5 / finalScale;
         ctx.beginPath();
-        ctx.moveTo(0, -bLen); // Bow
-        ctx.quadraticCurveTo(bWid / 2, -bLen * 0.8, bWid / 2, -bLen * 0.6); // Bow curve right
-        ctx.lineTo(bWid / 2, 0); // Stern right corner
-        ctx.lineTo(-bWid / 2, 0); // Stern left corner
-        ctx.lineTo(-bWid / 2, -bLen * 0.6); // Bow straight left
-        ctx.quadraticCurveTo(-bWid / 2, -bLen * 0.8, 0, -bLen); // Bow curve left
+        ctx.moveTo(0, -hl); // Bow
+        ctx.quadraticCurveTo(hw, -bLen * 0.3, hw, -bLen * 0.1); // Bow curve right
+        ctx.lineTo(hw, hl); // Stern right corner
+        ctx.lineTo(-hw, hl); // Stern left corner
+        ctx.lineTo(-hw, -bLen * 0.1); // Bow straight left
+        ctx.quadraticCurveTo(-hw, -bLen * 0.3, 0, -hl); // Bow curve left
         ctx.closePath();
         ctx.stroke();
         ctx.restore();
@@ -1044,15 +1364,15 @@ function draw() {
 
     // Wood Deck details
     ctx.fillStyle = 'rgba(211, 140, 71, 0.15)';
-    ctx.fillRect(-bWid * 0.35, -bLen * 0.8, bWid * 0.7, bLen * 0.75);
+    ctx.fillRect(-bWid * 0.35, -bLen * 0.3, bWid * 0.7, bLen * 0.75);
     
     // Draw wood lines
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.15)';
     ctx.lineWidth = 1;
     for (let xOff = -bWid*0.3; xOff <= bWid*0.3; xOff += bWid*0.1) {
         ctx.beginPath();
-        ctx.moveTo(xOff, -bLen * 0.8);
-        ctx.lineTo(xOff, -bLen * 0.05);
+        ctx.moveTo(xOff, -bLen * 0.3);
+        ctx.lineTo(xOff, bLen * 0.45);
         ctx.stroke();
     }
 
@@ -1060,30 +1380,30 @@ function draw() {
     ctx.fillStyle = '#2f3b5c';
     ctx.strokeStyle = '#6c7d9c';
     ctx.lineWidth = 2;
-    ctx.fillRect(-bWid * 0.3, -bLen * 0.55, bWid * 0.6, bLen * 0.25);
-    ctx.strokeRect(-bWid * 0.3, -bLen * 0.55, bWid * 0.6, bLen * 0.25);
+    ctx.fillRect(-bWid * 0.3, -bLen * 0.05, bWid * 0.6, bLen * 0.25);
+    ctx.strokeRect(-bWid * 0.3, -bLen * 0.05, bWid * 0.6, bLen * 0.25);
 
     // Windshield (cyan tinted glass)
     ctx.fillStyle = 'rgba(0, 221, 255, 0.4)';
     ctx.beginPath();
-    ctx.moveTo(-bWid * 0.25, -bLen * 0.55);
-    ctx.lineTo(bWid * 0.25, -bLen * 0.55);
-    ctx.lineTo(bWid * 0.2, -bLen * 0.5);
-    ctx.lineTo(-bWid * 0.2, -bLen * 0.5);
+    ctx.moveTo(-bWid * 0.25, -bLen * 0.05);
+    ctx.lineTo(bWid * 0.25, -bLen * 0.05);
+    ctx.lineTo(bWid * 0.2, 0);
+    ctx.lineTo(-bWid * 0.2, 0);
     ctx.closePath();
     ctx.fill();
 
     // Bow Fender rubber bumper
     ctx.beginPath();
-    ctx.moveTo(0, -bLen - 2);
-    ctx.quadraticCurveTo(bWid / 2 + 2, -bLen * 0.8, bWid / 2 + 2, -bLen * 0.6);
+    ctx.moveTo(0, -hl - 2);
+    ctx.quadraticCurveTo(hw + 2, -bLen * 0.3, hw + 2, -bLen * 0.1);
     ctx.strokeStyle = '#090a0f';
     ctx.lineWidth = 4;
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(0, -bLen - 2);
-    ctx.quadraticCurveTo(-bWid / 2 - 2, -bLen * 0.8, -bWid / 2 - 2, -bLen * 0.6);
+    ctx.moveTo(0, -hl - 2);
+    ctx.quadraticCurveTo(-hw - 2, -bLen * 0.3, -hw - 2, -bLen * 0.1);
     ctx.stroke();
 
     // G. Draw Azimuth Thrusters
@@ -1098,7 +1418,7 @@ function draw() {
 
 function drawThruster(lx, ly, angle, speed, color) {
     ctx.save();
-    ctx.translate(lx, -ly); // stern is at positive canvas local y inside the translated frame
+    ctx.translate(lx, ly); // stern is at positive canvas local y inside the translated frame
     ctx.rotate(angle); // rotate pod relative to boat heading
 
     // Thruster Mount / Gearbox housing

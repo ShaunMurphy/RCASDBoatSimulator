@@ -44,6 +44,10 @@ export class BoatPhysics {
             collisionRadius: 0.35 // meters (for boundary and dock collisions)
         };
 
+        this.targetShip = new TargetVessel();
+        this.targetShipActive = true;
+        this.towLineAttached = false;
+
         // Current boat state (World Coordinates: +x = East, +y = North)
         this.state = {
             x: 0.0,          // Position x (meters)
@@ -90,6 +94,10 @@ export class BoatPhysics {
         this.state.ax = 0.0;
         this.state.ay = 0.0;
         this.state.alpha = 0.0;
+        if (this.targetShip) {
+            this.targetShip.reset();
+        }
+        this.towLineAttached = false;
     }
 
     /**
@@ -191,10 +199,78 @@ export class BoatPhysics {
             netForceWorldY += relWy * 0.8;
         }
 
+        // --- 6.5. Tow Line Force computation ---
+        let towForceTugX = 0;
+        let towForceTugY = 0;
+        let towTorqueTug = 0;
+        let towForceShipX = 0;
+        let towForceShipY = 0;
+        let towTorqueShip = 0;
+
+        if (this.targetShipActive && this.towLineAttached && this.targetShip) {
+            const L_tug = this.config.length;
+            const L_ship = this.targetShip.config.length;
+
+            // Tug attachment at stern (local offset: 0, -L_tug/2)
+            const [attTugWx, attTugWy] = this.localToWorld(0, -L_tug/2);
+            const xTugAtt = this.state.x + attTugWx;
+            const yTugAtt = this.state.y + attTugWy;
+
+            // Ship attachment at bow (local offset: 0, +L_ship/2)
+            const cosS = Math.cos(this.targetShip.state.phi);
+            const sinS = Math.sin(this.targetShip.state.phi);
+            const attShipWx = (L_ship/2) * sinS;
+            const attShipWy = (L_ship/2) * cosS;
+            const xShipAtt = this.targetShip.state.x + attShipWx;
+            const yShipAtt = this.targetShip.state.y + attShipWy;
+
+            const dx = xTugAtt - xShipAtt;
+            const dy = yTugAtt - yShipAtt;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const ropeLength = this.config.towRopeLength || 1.6; // meters
+
+            if (dist > ropeLength) {
+                const ux = dx / dist;
+                const uy = dy / dist;
+
+                // Attachment point velocities
+                const vxTugAtt = this.state.vx - this.state.omega * attTugWy;
+                const vyTugAtt = this.state.vy + this.state.omega * attTugWx;
+
+                const vxShipAtt = this.targetShip.state.vx - this.targetShip.state.omega * attShipWy;
+                const vyShipAtt = this.targetShip.state.vy + this.targetShip.state.omega * attShipWx;
+
+                const vdx = vxTugAtt - vxShipAtt;
+                const vdy = vyTugAtt - vyShipAtt;
+                const vRelRope = vdx * ux + vdy * uy;
+
+                const kSpring = 90.0;
+                const kDamping = 8.0;
+                let tension = kSpring * (dist - ropeLength) + kDamping * vRelRope;
+                if (tension < 0.0) tension = 0.0;
+
+                // Tug pull is towards ship
+                towForceTugX = -ux * tension;
+                towForceTugY = -uy * tension;
+
+                // Ship pull is towards tug
+                towForceShipX = ux * tension;
+                towForceShipY = uy * tension;
+
+                // Torques
+                towTorqueTug = attTugWx * towForceTugY - attTugWy * towForceTugX;
+                towTorqueShip = attShipWx * towForceShipY - attShipWy * towForceShipX;
+            }
+        }
+
+        // Apply towing forces to tugboat world forces
+        netForceWorldX += towForceTugX;
+        netForceWorldY += towForceTugY;
+
         // --- 7. State updates (Euler Integration) ---
         this.state.ax = netForceWorldX / this.config.mass;
         this.state.ay = netForceWorldY / this.config.mass;
-        this.state.alpha = netTorque / this.config.inertia;
+        this.state.alpha = (netTorque + towTorqueTug) / this.config.inertia;
 
         this.state.vx += this.state.ax * dt;
         this.state.vy += this.state.ay * dt;
@@ -206,6 +282,11 @@ export class BoatPhysics {
 
         // Keep phi in [-PI, PI]
         this.state.phi = Math.atan2(Math.sin(this.state.phi), Math.cos(this.state.phi));
+
+        // Update target ship state
+        if (this.targetShipActive && this.targetShip) {
+            this.targetShip.step(dt, towForceShipX, towForceShipY, towTorqueShip);
+        }
 
         // --- 8. Collisions & Boundaries ---
         this.resolveCollisions();
@@ -293,5 +374,338 @@ export class BoatPhysics {
                 }
             }
         }
+
+        // --- 9. Tugboat vs Target Ship Collision (Circle vs Oriented Bounding Box) ---
+        if (this.targetShipActive && this.targetShip) {
+            const ship = this.targetShip;
+            const shipL = ship.config.length;
+            const shipW = ship.config.width;
+            
+            // Relative vector from ship to tug
+            const dx = this.state.x - ship.state.x;
+            const dy = this.state.y - ship.state.y;
+            
+            // Rotate relative vector into ship's local coordinate system
+            const cosS = Math.cos(ship.state.phi);
+            const sinS = Math.sin(ship.state.phi);
+            const localX = dx * cosS - dy * sinS;
+            const localY = dx * sinS + dy * cosS;
+            
+            // Closest point on AABB in ship local coordinate space
+            const hw = shipW / 2.0;
+            const hl = shipL / 2.0;
+            const clampedX = Math.max(-hw, Math.min(localX, hw));
+            const clampedY = Math.max(-hl, Math.min(localY, hl));
+            
+            // Distance vector in local space
+            const diffX = localX - clampedX;
+            const diffY = localY - clampedY;
+            const dist = Math.sqrt(diffX * diffX + diffY * diffY);
+            
+            if (dist < R) {
+                // Collision detected!
+                const pen = R - dist;
+                
+                // Normal vector in local space (points from closest point on ship to tug center)
+                let localNx = 0.0;
+                let localNy = 0.0;
+                if (dist > 0.0001) {
+                    localNx = diffX / dist;
+                    localNy = diffY / dist;
+                } else {
+                    localNx = 1.0; // default push
+                }
+                
+                // Rotate normal back to world space
+                const nx = localNx * cosS + localNy * sinS;
+                const ny = -localNx * sinS + localNy * cosS;
+                
+                // Resolve position overlap (Mass weighted push)
+                const mTug = this.config.mass;
+                const mShip = ship.config.mass;
+                const mSum = mTug + mShip;
+                
+                // Push tug out
+                this.state.x += nx * pen * (mShip / mSum);
+                this.state.y += ny * pen * (mShip / mSum);
+                
+                // Push ship back
+                ship.state.x -= nx * pen * (mTug / mSum);
+                ship.state.y -= ny * pen * (mTug / mSum);
+                
+                // Relative velocity at collision point (including rotational terms)
+                // v_point = v_cg + omega x r
+                // In 2D: v_pt_x = vx - omega * r_y; v_pt_y = vy + omega * r_x;
+                const xCol = ship.state.x + clampedX * cosS - clampedY * sinS;
+                const yCol = ship.state.y + clampedX * sinS + clampedY * cosS;
+
+                const rxShip = xCol - ship.state.x;
+                const ryShip = yCol - ship.state.y;
+                const rxTug = xCol - this.state.x;
+                const ryTug = yCol - this.state.y;
+
+                const vpTugX = this.state.vx - this.state.omega * ryTug;
+                const vpTugY = this.state.vy + this.state.omega * rxTug;
+                const vpShipX = ship.state.vx - ship.state.omega * ryShip;
+                const vpShipY = ship.state.vy + ship.state.omega * rxShip;
+
+                const rvdX = vpTugX - vpShipX;
+                const rvdY = vpTugY - vpShipY;
+                const velNormal = rvdX * nx + rvdY * ny;
+                
+                if (velNormal < 0) {
+                    const e = 0.15; // restitution
+                    
+                    // Effective mass for rotation: 1/m_eff = 1/m + (r_perp^2)/I
+                    // r_perp = r x n = r_x * n_y - r_y * n_x
+                    const rnTug = rxTug * ny - ryTug * nx;
+                    const rnShip = rxShip * ny - ryShip * nx;
+                    
+                    const invMassTug = 1.0 / mTug + (rnTug * rnTug) / this.config.inertia;
+                    const invMassShip = 1.0 / mShip + (rnShip * rnShip) / ship.config.inertia;
+                    
+                    const impulse = -(1.0 + e) * velNormal / (invMassTug + invMassShip);
+                    
+                    // Apply linear velocity changes
+                    this.state.vx += nx * (impulse / mTug);
+                    this.state.vy += ny * (impulse / mTug);
+                    ship.state.vx -= nx * (impulse / mShip);
+                    ship.state.vy -= ny * (impulse / mShip);
+                    
+                    // Apply angular velocity changes
+                    // Force on ship is -nx * impulse, -ny * impulse
+                    const FxShip = -nx * impulse;
+                    const FyShip = -ny * impulse;
+                    const torqueShip = ryShip * FxShip - rxShip * FyShip;
+                    ship.state.omega += torqueShip / ship.config.inertia;
+                    
+                    // Force on tug is +nx * impulse, +ny * impulse
+                    const FxTug = nx * impulse;
+                    const FyTug = ny * impulse;
+                    const torqueTug = ryTug * FxTug - rxTug * FyTug;
+                    this.state.omega += torqueTug / this.config.inertia;
+                }
+            }
+        }
+
+        // --- 10. Target Ship vs Boundaries & Obstacles (represented by 5 centerline circles) ---
+        if (this.targetShipActive && this.targetShip) {
+            const ship = this.targetShip;
+            const shipL = ship.config.length;
+            const shipR = ship.config.width / 2.0; // segment radius
+            const offsets = [-1.8, -0.9, 0.0, 0.9, 1.8];
+            const cosS = Math.cos(ship.state.phi);
+            const sinS = Math.sin(ship.state.phi);
+            
+            offsets.forEach(offset => {
+                // World coordinates of this segment center
+                const sx = ship.state.x + offset * sinS;
+                const sy = ship.state.y + offset * cosS;
+                
+                // A. Boundary check for ship segment
+                let pushX = 0;
+                let pushY = 0;
+                
+                if (sx < -halfPond + shipR) pushX = (-halfPond + shipR) - sx;
+                if (sx > halfPond - shipR) pushX = (halfPond - shipR) - sx;
+                if (sy < -halfPond + shipR) pushY = (-halfPond + shipR) - sy;
+                if (sy > halfPond - shipR) pushY = (halfPond - shipR) - sy;
+                
+                if (pushX !== 0 || pushY !== 0) {
+                    // Shift ship center of mass
+                    ship.state.x += pushX;
+                    ship.state.y += pushY;
+                    
+                    // Rotate ship away from boundary collision
+                    // Torque: r_x * F_y - r_y * F_x
+                    const rx = offset * sinS;
+                    const ry = offset * cosS;
+                    const torque = rx * pushY - ry * pushX;
+                    ship.state.phi += torque * 0.05;
+                    
+                    // Dampen velocities
+                    if (pushX !== 0) ship.state.vx = -ship.state.vx * 0.1;
+                    if (pushY !== 0) ship.state.vy = -ship.state.vy * 0.1;
+                    ship.state.omega *= 0.5;
+                }
+                
+                // B. Obstacle check for ship segment
+                this.obstacles.forEach(obs => {
+                    if (obs.type === 'dock') {
+                        const px = Math.max(obs.x1, Math.min(sx, obs.x2));
+                        const py = Math.max(obs.y1, Math.min(sy, obs.y2));
+                        
+                        const dx = sx - px;
+                        const dy = sy - py;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < shipR && dist > 0.0001) {
+                            const nx = dx / dist;
+                            const ny = dy / dist;
+                            const pen = shipR - dist;
+                            
+                            const pushDockX = nx * pen;
+                            const pushDockY = ny * pen;
+                            
+                            // Push ship center
+                            ship.state.x += pushDockX;
+                            ship.state.y += pushDockY;
+                            
+                            // Torque to rotate
+                            const rx = offset * sinS;
+                            const ry = offset * cosS;
+                            const torque = rx * pushDockY - ry * pushDockX;
+                            ship.state.phi += torque * 0.08;
+                            
+                            // Velocities
+                            const velNormal = ship.state.vx * nx + ship.state.vy * ny;
+                            if (velNormal < 0) {
+                                ship.state.vx -= 1.1 * velNormal * nx;
+                                ship.state.vy -= 1.1 * velNormal * ny;
+                            }
+                            ship.state.omega *= 0.5;
+                        }
+                    } else if (obs.type === 'buoy') {
+                        const dx = sx - obs.x;
+                        const dy = sy - obs.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const minDist = shipR + obs.r;
+                        
+                        if (dist < minDist && dist > 0.0001) {
+                            const nx = dx / dist;
+                            const ny = dy / dist;
+                            const pen = minDist - dist;
+                            
+                            const pushBuoyX = nx * pen;
+                            const pushBuoyY = ny * pen;
+                            
+                            // Push ship center
+                            ship.state.x += pushBuoyX;
+                            ship.state.y += pushBuoyY;
+                            
+                            // Torque
+                            const rx = offset * sinS;
+                            const ry = offset * cosS;
+                            const torque = rx * pushBuoyY - ry * pushBuoyX;
+                            ship.state.phi += torque * 0.08;
+                            
+                            const velNormal = ship.state.vx * nx + ship.state.vy * ny;
+                            if (velNormal < 0) {
+                                ship.state.vx -= 1.1 * velNormal * nx;
+                                ship.state.vy -= 1.1 * velNormal * ny;
+                            }
+                            ship.state.omega *= 0.5;
+                        }
+                    }
+                });
+            });
+        }
+    }
+}
+
+export class TargetVessel {
+    constructor() {
+        this.config = {
+            mass: 120.0,          // kg
+            inertia: 250.0,       // kg*m^2
+            length: 4.8,          // meters
+            width: 0.95,          // meters
+            collisionRadius: 2.4, // bounding radius
+            dragLinearX: 70.0,    // high lateral drag
+            dragLinearY: 12.0,    // forward drag
+            dragAngular: 60.0,    // angular drag
+            thrustMax: 16.0       // Newtons (when engine is active)
+        };
+
+        this.state = {
+            x: 8.0,              // Position x (meters, starting to the right)
+            y: 5.0,              // Position y (meters)
+            phi: 0.2,            // Heading angle (radians, tilted slightly)
+            vx: 0.0,             // velocity x
+            vy: 0.0,             // velocity y
+            omega: 0.0,          // angular velocity
+            ax: 0.0,
+            ay: 0.0,
+            alpha: 0.0
+        };
+
+        this.controls = {
+            engineKilled: false,
+            throttle: 0.0,       // -1.0 to 1.0
+            rudderAngle: 0.0     // radians
+        };
+    }
+
+    reset() {
+        this.state.x = 8.0;
+        this.state.y = 5.0;
+        this.state.phi = 0.2;
+        this.state.vx = 0.0;
+        this.state.vy = 0.0;
+        this.state.omega = 0.0;
+        this.state.ax = 0.0;
+        this.state.ay = 0.0;
+        this.state.alpha = 0.0;
+        this.controls.engineKilled = false;
+        this.controls.throttle = 0.0;
+        this.controls.rudderAngle = 0.0;
+    }
+
+    step(dt, pullForceX = 0, pullForceY = 0, pullTorque = 0) {
+        if (dt <= 0) return;
+
+        // 1. Get local velocities
+        const cos = Math.cos(this.state.phi);
+        const sin = Math.sin(this.state.phi);
+        const u = this.state.vx * cos - this.state.vy * sin; // local lateral
+        const v = this.state.vx * sin + this.state.vy * cos; // local forward
+
+        // 2. Linear and angular drag forces in local frame
+        const dragForceLocalX = -this.config.dragLinearX * u * Math.abs(u);
+        const dragForceLocalY = -this.config.dragLinearY * v * Math.abs(v);
+        const dragTorque = -this.config.dragAngular * this.state.omega * Math.abs(this.state.omega);
+
+        // 3. Engine Thrust Force
+        const F_thrust = this.controls.engineKilled ? 0.0 : this.controls.throttle * this.config.thrustMax;
+        const thrustForceLocalX = 0.0;
+        const thrustForceLocalY = F_thrust;
+
+        // 4. Rudder Force and Torque (located at the stern y = -L/2)
+        const rudderAngle = this.controls.rudderAngle;
+        const rudderLiftCoefficient = 12.0; // lift strength
+        const rudderForceLocalX = -rudderLiftCoefficient * v * Math.sin(rudderAngle);
+        
+        const r_rudder_y = -this.config.length / 2.0;
+        const rudderTorque = -r_rudder_y * rudderForceLocalX;
+
+        // 5. Net forces in local frame
+        const netForceLocalX = dragForceLocalX + rudderForceLocalX;
+        const netForceLocalY = dragForceLocalY + thrustForceLocalY;
+        const netTorque = dragTorque + rudderTorque;
+
+        // 6. Convert local forces to world coordinates
+        let netForceWorldX = netForceLocalX * cos + netForceLocalY * sin;
+        let netForceWorldY = -netForceLocalX * sin + netForceLocalY * cos;
+
+        // 7. Add tow line pull force (already in world coords) and torque
+        netForceWorldX += pullForceX;
+        netForceWorldY += pullForceY;
+        const totalTorque = netTorque + pullTorque;
+
+        // 8. Integrate state (Euler Integration)
+        this.state.ax = netForceWorldX / this.config.mass;
+        this.state.ay = netForceWorldY / this.config.mass;
+        this.state.alpha = totalTorque / this.config.inertia;
+
+        this.state.vx += this.state.ax * dt;
+        this.state.vy += this.state.ay * dt;
+        this.state.omega += this.state.alpha * dt;
+
+        this.state.x += this.state.vx * dt;
+        this.state.y += this.state.vy * dt;
+        this.state.phi += this.state.omega * dt;
+
+        // Keep phi in range [-PI, PI]
+        this.state.phi = Math.atan2(Math.sin(this.state.phi), Math.cos(this.state.phi));
     }
 }
