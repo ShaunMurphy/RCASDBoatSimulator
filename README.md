@@ -30,13 +30,23 @@ A real-time, browser-based simulator for **2-channel RC (Radio Control) Azimuth 
 
 ### 🔀 Control Mixing Algorithms
 
-Three built-in mixing modes plus user-defined custom algorithms:
+Four built-in mixing modes plus user-defined custom algorithms:
 
 | Mode | Description |
 |------|-------------|
 | **Vectored** | Full ASD vectoring with translation, rotation, and lateral thrust components. Supports toe-in angle, differential speed, and lateral sideways thrust. |
 | **Differential** | Classic differential steering — speed difference between left and right motors drives rotation. No lateral thrust vectoring. |
+| **Crab Walk** | Lateral translation mixing. Coordinates azimuth pod angles ($k = -d_y / d_x = 4.2667$) to generate sideways sway forces with zero net turning torque. |
 | **Custom** | User-defined mathematical equations for all four actuator targets — parsed and evaluated securely without JavaScript execution. |
+
+### 🎮 2-Channel & 4-Channel Transmitter Configuration
+
+- **2-Channel Mode**: Standard setup using a single gimbal (Ch1 Steering, Ch2 Throttle).
+- **4-Channel Mode**: Advanced setup featuring dual gimbals:
+  - **Right Stick**: Steering (Ch1) and Throttle (Ch2).
+  - **Left Stick**: Auxiliary sway (Ch3) and spin (Ch4).
+  - **Auxiliary Modes**: Map the Left Stick to overlay pure lateral slide (sway) or pure yaw rotation (spin) on top of the primary control superposition vectors.
+  - Telemetry readouts and C++ previews automatically expand to support all 4 channels.
 
 ### 📐 Safe Custom Mixing Equations
 
