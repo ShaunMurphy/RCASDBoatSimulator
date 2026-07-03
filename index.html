@@ -305,7 +305,7 @@
                 <div class="canvas-overlay-instructions">
                     Controls:<br>
                     - Drag <b>RC Joystick</b> with mouse/touch<br>
-                    - Or use <b>WASD / Arrow Keys</b> (returns to center automatically)<br>
+                    <span id="keyboardInstructions">- Or use <b>WASD / Arrow Keys</b> (returns to center automatically)</span><br>
                     - Toggle obstacles to practice precision docking!
                 </div>
 
@@ -389,6 +389,10 @@
                 <button class="tab-btn" id="tabCode">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                     Code
+                </button>
+                <button class="tab-btn" id="tabWiring">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="12" y1="9" x2="12" y2="15"/></svg>
+                    Wiring
                 </button>
             </div>
 
@@ -495,6 +499,64 @@
                     </select>
                 </div>
                 <div class="code-viewer" id="codeText" style="flex: 1; margin: 0; height: calc(100% - 30px);"></div>
+            </div>
+
+            <!-- Wiring Diagram Panel -->
+            <div class="panel-content" id="panelWiring" style="display: none; padding: 12px; flex-direction: column; gap: 10px; height: 100%; box-sizing: border-box;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                    <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Interactive Wiring</span>
+                    <span id="wiringPlatformLabel" style="font-size: 10px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono);">ARDUINO UNO</span>
+                </div>
+                <div id="wiringDiagramContainer" style="flex: 1; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-lg); position: relative; width: 100%; min-height: 420px; overflow: hidden; box-sizing: border-box;">
+                    <!-- SVG Overlay -->
+                    <svg id="wiringSVG" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1;"></svg>
+                    
+                    <!-- Receiver (top-left) -->
+                    <div class="wiring-card" id="wiringRx" style="position: absolute; top: 15px; left: 15px; width: 110px; z-index: 2;">
+                        <div class="wiring-card-title">RC Receiver</div>
+                        <div class="wiring-pin" id="pinRxCh1"><span>CH1 (Steer)</span><span class="wiring-dot" id="dotRxCh1"></span></div>
+                        <div class="wiring-pin" id="pinRxCh2"><span>CH2 (Throt)</span><span class="wiring-dot" id="dotRxCh2"></span></div>
+                        <div class="wiring-pin" id="pinRxCh3" style="display: none;"><span>CH3 (Sway)</span><span class="wiring-dot" id="dotRxCh3"></span></div>
+                        <div class="wiring-pin" id="pinRxCh4" style="display: none;"><span>CH4 (Spin)</span><span class="wiring-dot" id="dotRxCh4"></span></div>
+                    </div>
+
+                    <!-- Battery (top-right) -->
+                    <div class="wiring-card" id="wiringPower" style="position: absolute; top: 15px; right: 15px; width: 110px; z-index: 2;">
+                        <div class="wiring-card-title">BEC Battery</div>
+                        <div class="wiring-pin" id="pinBatPos"><span>VCC (5V)</span><span class="wiring-dot" id="dotBatPos" style="background: #ff453a;"></span></div>
+                        <div class="wiring-pin" id="pinBatNeg"><span>GND (0V)</span><span class="wiring-dot" id="dotBatNeg" style="background: #ffffff;"></span></div>
+                    </div>
+
+                    <!-- Microcontroller (center) -->
+                    <div class="wiring-card" id="wiringMcu" style="position: absolute; top: 115px; left: 75px; width: 140px; z-index: 2;">
+                        <div class="wiring-card-title" id="wiringMcuTitle">Arduino Uno</div>
+                        <!-- Inputs -->
+                        <div class="wiring-pin" id="pinMcuIn1"><span class="wiring-dot" id="dotMcuIn1"></span><span id="labelMcuIn1">D2 (CH1)</span></div>
+                        <div class="wiring-pin" id="pinMcuIn2"><span class="wiring-dot" id="dotMcuIn2"></span><span id="labelMcuIn2">D3 (CH2)</span></div>
+                        <div class="wiring-pin" id="pinMcuIn3" style="display: none;"><span class="wiring-dot" id="dotMcuIn3"></span><span id="labelMcuIn3">D4 (CH3)</span></div>
+                        <div class="wiring-pin" id="pinMcuIn4" style="display: none;"><span class="wiring-dot" id="dotMcuIn4"></span><span id="labelMcuIn4">D7 (CH4)</span></div>
+                        <div style="height: 4px; border-bottom: 1px dashed rgba(255,255,255,0.05); margin: 2px 0;"></div>
+                        <!-- Outputs -->
+                        <div class="wiring-pin" id="pinMcuOut1"><span id="labelMcuOut1">D9 (ServoL)</span><span class="wiring-dot" id="dotMcuOut1"></span></div>
+                        <div class="wiring-pin" id="pinMcuOut2"><span id="labelMcuOut2">D10 (ServoR)</span><span class="wiring-dot" id="dotMcuOut2"></span></div>
+                        <div class="wiring-pin" id="pinMcuOut3"><span id="labelMcuOut3">D5 (ESCL)</span><span class="wiring-dot" id="dotMcuOut3"></span></div>
+                        <div class="wiring-pin" id="pinMcuOut4"><span id="labelMcuOut4">D6 (ESCR)</span><span class="wiring-dot" id="dotMcuOut4"></span></div>
+                    </div>
+
+                    <!-- Left Pod Actuators (bottom-left) -->
+                    <div class="wiring-card" id="wiringPodL" style="position: absolute; bottom: 15px; left: 15px; width: 110px; z-index: 2;">
+                        <div class="wiring-card-title">Port Pod</div>
+                        <div class="wiring-pin" id="pinServoL"><span class="wiring-dot" id="dotServoL"></span><span>Servo (Sig)</span></div>
+                        <div class="wiring-pin" id="pinEscL"><span class="wiring-dot" id="dotEscL"></span><span>ESC (Sig)</span></div>
+                    </div>
+
+                    <!-- Right Pod Actuators (bottom-right) -->
+                    <div class="wiring-card" id="wiringPodR" style="position: absolute; bottom: 15px; right: 15px; width: 110px; z-index: 2;">
+                        <div class="wiring-card-title">Starboard Pod</div>
+                        <div class="wiring-pin" id="pinServoR"><span class="wiring-dot" id="dotServoR"></span><span>Servo (Sig)</span></div>
+                        <div class="wiring-pin" id="pinEscR"><span class="wiring-dot" id="dotEscR"></span><span>ESC (Sig)</span></div>
+                    </div>
+                </div>
             </div>
         </aside>
     </div>

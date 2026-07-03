@@ -106,6 +106,7 @@ const txtCh3 = document.getElementById('txtCh3');
 const txtCh4 = document.getElementById('txtCh4');
 const cardCh3 = document.getElementById('cardCh3');
 const cardCh4 = document.getElementById('cardCh4');
+const keyboardInstructions = document.getElementById('keyboardInstructions');
 
 // Dynamic stats
 const statSpeed = document.getElementById('statSpeed');
@@ -115,10 +116,24 @@ const statTurn = document.getElementById('statTurn');
 // Tabs & Right Panels
 const tabDiagnostics = document.getElementById('tabDiagnostics');
 const tabCode = document.getElementById('tabCode');
+const tabWiring = document.getElementById('tabWiring');
 const panelDiagnostics = document.getElementById('panelDiagnostics');
 const panelCode = document.getElementById('panelCode');
+const panelWiring = document.getElementById('panelWiring');
 const selectPlatform = document.getElementById('selectPlatform');
 const codeText = document.getElementById('codeText');
+
+// Wiring diagram specific components
+const wiringPlatformLabel = document.getElementById('wiringPlatformLabel');
+const wiringMcuTitle = document.getElementById('wiringMcuTitle');
+const labelMcuIn1 = document.getElementById('labelMcuIn1');
+const labelMcuIn2 = document.getElementById('labelMcuIn2');
+const labelMcuIn3 = document.getElementById('labelMcuIn3');
+const labelMcuIn4 = document.getElementById('labelMcuIn4');
+const labelMcuOut1 = document.getElementById('labelMcuOut1');
+const labelMcuOut2 = document.getElementById('labelMcuOut2');
+const labelMcuOut3 = document.getElementById('labelMcuOut3');
+const labelMcuOut4 = document.getElementById('labelMcuOut4');
 
 // Custom Mixing Mode Editor Elements
 const btnNewAlgo = document.getElementById('btnNewAlgo');
@@ -171,6 +186,7 @@ let isDraggingJoystickLeft = false;
 let joystickVal = { x: 0.0, y: 0.0 }; // Normalized (-1.0 to 1.0)
 let joystickValLeft = { x: 0.0, y: 0.0 }; // Normalized (-1.0 to 1.0)
 let keyboardTarget = { x: 0.0, y: 0.0 }; // Joystick destination target from keys
+let keyboardTargetLeft = { x: 0.0, y: 0.0 }; // Left stick destination target from keys
 let activeKeys = {};
 
 // Boat Trail & Particle System
@@ -227,6 +243,15 @@ function applyConfig() {
         joystickValLeft.x = 0.0;
         joystickValLeft.y = 0.0;
         updateVisualJoystickLeft(0.0, 0.0);
+    }
+
+    // Update keyboard instructions hint based on mode
+    if (keyboardInstructions) {
+        if (is4ch) {
+            keyboardInstructions.innerHTML = '- Left Stick (Aux): <b>WASD Keys</b> | Right Stick: <b>Arrow Keys</b>';
+        } else {
+            keyboardInstructions.innerHTML = '- Or use <b>WASD / Arrow Keys</b> (returns to center automatically)';
+        }
     }
 
     // Show/hide Edit/Delete buttons for custom modes
@@ -434,19 +459,35 @@ setTheme(savedTheme);
 
 // Tab Toggles
 tabDiagnostics.addEventListener('click', () => {
-    tabDiagnostics.classList.add('active');
-    tabCode.classList.remove('active');
-    panelDiagnostics.style.display = 'flex';
-    panelCode.style.display = 'none';
+    setTabActive('diagnostics');
 });
 
 tabCode.addEventListener('click', () => {
-    tabCode.classList.add('active');
-    tabDiagnostics.classList.remove('active');
-    panelDiagnostics.style.display = 'none';
-    panelCode.style.display = 'flex';
-    renderArduinoCode();
+    setTabActive('code');
 });
+
+if (tabWiring) {
+    tabWiring.addEventListener('click', () => {
+        setTabActive('wiring');
+    });
+}
+
+function setTabActive(tabName) {
+    tabDiagnostics.classList.toggle('active', tabName === 'diagnostics');
+    tabCode.classList.toggle('active', tabName === 'code');
+    if (tabWiring) tabWiring.classList.toggle('active', tabName === 'wiring');
+    
+    panelDiagnostics.style.display = tabName === 'diagnostics' ? 'flex' : 'none';
+    panelCode.style.display = tabName === 'code' ? 'flex' : 'none';
+    if (panelWiring) panelWiring.style.display = tabName === 'wiring' ? 'flex' : 'none';
+    
+    if (tabName === 'code') {
+        renderArduinoCode();
+    }
+    if (tabName === 'wiring') {
+        drawWiringDiagram();
+    }
+}
 
 // General buttons
 btnReset.addEventListener('click', () => {
@@ -621,16 +662,48 @@ window.addEventListener('keyup', (e) => {
 });
 
 function updateKeyboardTargets() {
-    let tx = 0.0;
-    let ty = 0.0;
+    const is4ch = selectChannelMode && selectChannelMode.value === '4';
 
-    if (activeKeys['ArrowUp'] || activeKeys['KeyW']) ty += 1.0;
-    if (activeKeys['ArrowDown'] || activeKeys['KeyS']) ty -= 1.0;
-    if (activeKeys['ArrowLeft'] || activeKeys['KeyA']) tx -= 1.0;
-    if (activeKeys['ArrowRight'] || activeKeys['KeyD']) tx += 1.0;
+    if (is4ch) {
+        // --- 4-Channel Mode ---
+        // Right stick: Arrow Keys
+        let rx = 0.0;
+        let ry = 0.0;
+        if (activeKeys['ArrowUp']) ry += 1.0;
+        if (activeKeys['ArrowDown']) ry -= 1.0;
+        if (activeKeys['ArrowLeft']) rx -= 1.0;
+        if (activeKeys['ArrowRight']) rx += 1.0;
+        
+        keyboardTarget.x = rx;
+        keyboardTarget.y = ry;
 
-    keyboardTarget.x = tx;
-    keyboardTarget.y = ty;
+        // Left stick: WASD Keys
+        let lx = 0.0;
+        let ly = 0.0;
+        if (activeKeys['KeyW']) ly += 1.0;
+        if (activeKeys['KeyS']) ly -= 1.0;
+        if (activeKeys['KeyA']) lx -= 1.0;
+        if (activeKeys['KeyD']) lx += 1.0;
+
+        keyboardTargetLeft.x = lx;
+        keyboardTargetLeft.y = ly;
+    } else {
+        // --- 2-Channel Mode ---
+        // Both WASD and Arrow keys control the Right stick
+        let tx = 0.0;
+        let ty = 0.0;
+        if (activeKeys['ArrowUp'] || activeKeys['KeyW']) ty += 1.0;
+        if (activeKeys['ArrowDown'] || activeKeys['KeyS']) ty -= 1.0;
+        if (activeKeys['ArrowLeft'] || activeKeys['KeyA']) tx -= 1.0;
+        if (activeKeys['ArrowRight'] || activeKeys['KeyD']) tx += 1.0;
+
+        keyboardTarget.x = tx;
+        keyboardTarget.y = ty;
+
+        // Left stick centered
+        keyboardTargetLeft.x = 0.0;
+        keyboardTargetLeft.y = 0.0;
+    }
 }
 
 // Spring Joystick Centering (WASD Return or mouse release return)
@@ -647,6 +720,22 @@ function animateJoystick(dt) {
     if (Math.abs(joystickVal.y) < 0.005 && keyboardTarget.y === 0) joystickVal.y = 0;
 
     updateVisualJoystick(joystickVal.x, joystickVal.y);
+}
+
+// Spring Joystick Centering for Left Stick
+function animateJoystickLeft(dt) {
+    if (isDraggingJoystickLeft) return;
+
+    // Slew joystickValLeft towards keyboardTargetLeft
+    const speed = 12.0; // Slew speed factor
+    joystickValLeft.x += (keyboardTargetLeft.x - joystickValLeft.x) * speed * dt;
+    joystickValLeft.y += (keyboardTargetLeft.y - joystickValLeft.y) * speed * dt;
+
+    // Clamp small numbers to zero
+    if (Math.abs(joystickValLeft.x) < 0.005 && keyboardTargetLeft.x === 0) joystickValLeft.x = 0;
+    if (Math.abs(joystickValLeft.y) < 0.005 && keyboardTargetLeft.y === 0) joystickValLeft.y = 0;
+
+    updateVisualJoystickLeft(joystickValLeft.x, joystickValLeft.y);
 }
 
 // Particle System emitter
@@ -701,6 +790,7 @@ function loop(timeNow) {
 
     // 1. Process joystick spring return/slew
     animateJoystick(dt);
+    animateJoystickLeft(dt);
 
     // 2. Feed joystick values as PWM to Microcontroller controller
     const ch1_pwm = 1500 + joystickVal.x * 500;
@@ -762,6 +852,7 @@ function loop(timeNow) {
 
     // 8. Update Panels
     updateDiagnosticsDisplay();
+    drawWiringDiagram();
 
     requestAnimationFrame(loop);
 }
@@ -1704,6 +1795,105 @@ ${loopCode}
         `;
     }
     codeText.innerHTML = code;
+}
+
+function drawWiringDiagram() {
+    if (!panelWiring || panelWiring.style.display === 'none') return;
+    
+    const isESP32 = selectPlatform.value === 'esp32';
+    const is4ch = selectChannelMode.value === '4';
+    
+    // Update platform text labels
+    wiringPlatformLabel.innerText = isESP32 ? 'ESP32 DEVKIT' : 'ARDUINO UNO';
+    wiringMcuTitle.innerText = isESP32 ? 'ESP32 (WROOM-32)' : 'Arduino Uno';
+    
+    labelMcuIn1.innerText = isESP32 ? 'GPIO12 (CH1)' : 'D2 (CH1)';
+    labelMcuIn2.innerText = isESP32 ? 'GPIO13 (CH2)' : 'D3 (CH2)';
+    labelMcuIn3.innerText = isESP32 ? 'GPIO32 (CH3)' : 'D4 (CH3)';
+    labelMcuIn4.innerText = isESP32 ? 'GPIO33 (CH4)' : 'D7 (CH4)';
+    
+    labelMcuOut1.innerText = isESP32 ? 'GPIO25 (ServoL)' : 'D9 (ServoL)';
+    labelMcuOut2.innerText = isESP32 ? 'GPIO26 (ServoR)' : 'D10 (ServoR)';
+    labelMcuOut3.innerText = isESP32 ? 'GPIO14 (ESCL)' : 'D5 (ESCL)';
+    labelMcuOut4.innerText = isESP32 ? 'GPIO27 (ESCR)' : 'D6 (ESCR)';
+    
+    // Show/hide CH3/CH4 pins
+    document.getElementById('pinRxCh3').style.display = is4ch ? 'flex' : 'none';
+    document.getElementById('pinRxCh4').style.display = is4ch ? 'flex' : 'none';
+    document.getElementById('pinMcuIn3').style.display = is4ch ? 'flex' : 'none';
+    document.getElementById('pinMcuIn4').style.display = is4ch ? 'flex' : 'none';
+    
+    // Redraw SVG path lines
+    const svg = document.getElementById('wiringSVG');
+    svg.innerHTML = ''; // Clear existing paths
+    
+    const svgRect = svg.getBoundingClientRect();
+    if (svgRect.width === 0 || svgRect.height === 0) return; // parent panel not yet laid out
+    
+    function drawWire(dotStartId, dotEndId, color, valPercent = 0.0) {
+        const dotStart = document.getElementById(dotStartId);
+        const dotEnd = document.getElementById(dotEndId);
+        if (!dotStart || !dotEnd) return;
+        
+        const rStart = dotStart.getBoundingClientRect();
+        const rEnd = dotEnd.getBoundingClientRect();
+        
+        // Coordinates relative to SVG
+        const x1 = rStart.left + rStart.width / 2.0 - svgRect.left;
+        const y1 = rStart.top + rStart.height / 2.0 - svgRect.top;
+        const x2 = rEnd.left + rEnd.width / 2.0 - svgRect.left;
+        const y2 = rEnd.top + rEnd.height / 2.0 - svgRect.top;
+        
+        // Compute control points for a beautiful horizontal S-curve
+        const dx = Math.abs(x2 - x1);
+        const dy = Math.abs(y2 - y1);
+        const cx1 = x1 + dx * 0.4 * (x2 > x1 ? 1 : -1);
+        const cy1 = y1 + dy * 0.05 * (y2 > y1 ? 1 : -1);
+        const cx2 = x2 - dx * 0.4 * (x2 > x1 ? 1 : -1);
+        const cy2 = y2 - dy * 0.05 * (y2 > y1 ? 1 : -1);
+        
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', color);
+        path.setAttribute('stroke-width', (2.0 + Math.abs(valPercent) * 2.0).toFixed(1));
+        path.setAttribute('stroke-linecap', 'round');
+        
+        // If signal is active, add a neon glow filter or pulse
+        if (Math.abs(valPercent) > 0.05) {
+            path.setAttribute('filter', 'drop-shadow(0px 0px 3px ' + color + ')');
+            path.setAttribute('stroke-width', (3.0 + Math.abs(valPercent) * 2.5).toFixed(1));
+        } else {
+            path.setAttribute('opacity', '0.6');
+        }
+        
+        svg.appendChild(path);
+    }
+    
+    // Calculate active signal values for glow scaling
+    const normX = (controller.rcIn.ch1 - 1500) / 500.0;
+    const normY = (controller.rcIn.ch2 - 1500) / 500.0;
+    const normXAux = is4ch ? (controller.rcIn.ch3 - 1500) / 500.0 : 0.0;
+    const normYAux = is4ch ? (controller.rcIn.ch4 - 1500) / 500.0 : 0.0;
+    
+    // 1. Draw Input Wires (Rx -> MCU)
+    drawWire('dotRxCh1', 'dotMcuIn1', '#30d158', normX); // Green for Steering (Yaw)
+    drawWire('dotRxCh2', 'dotMcuIn2', '#0a84ff', normY); // Blue for Throttle (Speed)
+    if (is4ch) {
+        drawWire('dotRxCh3', 'dotMcuIn3', '#ff9f0a', normXAux); // Orange for Sway
+        drawWire('dotRxCh4', 'dotMcuIn4', '#bf5af2', normYAux); // Purple for Spin
+    }
+    
+    // 2. Draw Output Wires (MCU -> Pods)
+    const actServoL = controller.microOut.servoLeftAngle / (controller.config.maxToeIn || 1.0);
+    const actServoR = controller.microOut.servoRightAngle / (controller.config.maxToeIn || 1.0);
+    const actEscL = controller.microOut.escLeftSpeed;
+    const actEscR = controller.microOut.escRightSpeed;
+    
+    drawWire('dotMcuOut1', 'dotServoL', '#ff3547', actServoL); // Red (Servo L)
+    drawWire('dotMcuOut2', 'dotServoR', '#ff9f0a', actServoR); // Orange (Servo R)
+    drawWire('dotMcuOut3', 'dotEscL', '#30d158', actEscL);     // Green (ESC L)
+    drawWire('dotMcuOut4', 'dotEscR', '#0a84ff', actEscR);     // Blue (ESC R)
 }
 
 // --- Custom Mixing Mode Editor System ---
