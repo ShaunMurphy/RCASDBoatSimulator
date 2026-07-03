@@ -233,12 +233,13 @@ export class BoatPhysics {
                 const ux = dx / dist;
                 const uy = dy / dist;
 
-                // Attachment point velocities
-                const vxTugAtt = this.state.vx - this.state.omega * attTugWy;
-                const vyTugAtt = this.state.vy + this.state.omega * attTugWx;
+                // Attachment point velocities (v = v_cg + omega x r)
+                // Corrected signs for positive-clockwise yaw orientation
+                const vxTugAtt = this.state.vx + this.state.omega * attTugWy;
+                const vyTugAtt = this.state.vy - this.state.omega * attTugWx;
 
-                const vxShipAtt = this.targetShip.state.vx - this.targetShip.state.omega * attShipWy;
-                const vyShipAtt = this.targetShip.state.vy + this.targetShip.state.omega * attShipWx;
+                const vxShipAtt = this.targetShip.state.vx + this.targetShip.state.omega * attShipWy;
+                const vyShipAtt = this.targetShip.state.vy - this.targetShip.state.omega * attShipWx;
 
                 const vdx = vxTugAtt - vxShipAtt;
                 const vdy = vyTugAtt - vyShipAtt;
@@ -257,9 +258,9 @@ export class BoatPhysics {
                 towForceShipX = ux * tension;
                 towForceShipY = uy * tension;
 
-                // Torques
-                towTorqueTug = attTugWx * towForceTugY - attTugWy * towForceTugX;
-                towTorqueShip = attShipWx * towForceShipY - attShipWy * towForceShipX;
+                // Torques (tau = r_y * F_x - r_x * F_y, positive clockwise)
+                towTorqueTug = attTugWy * towForceTugX - attTugWx * towForceTugY;
+                towTorqueShip = attShipWy * towForceShipX - attShipWx * towForceShipY;
             }
         }
 
@@ -676,7 +677,7 @@ export class TargetVessel {
         const rudderForceLocalX = -rudderLiftCoefficient * v * Math.sin(rudderAngle);
         
         const r_rudder_y = -this.config.length / 2.0;
-        const rudderTorque = -r_rudder_y * rudderForceLocalX;
+        const rudderTorque = r_rudder_y * rudderForceLocalX;
 
         // 5. Net forces in local frame
         const netForceLocalX = dragForceLocalX + rudderForceLocalX;
