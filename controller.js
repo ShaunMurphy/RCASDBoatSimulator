@@ -352,8 +352,9 @@ export class ASDController {
                 } catch(err) {
                     console.error("Runtime error in custom algorithm evaluation:", err);
                 }
-                return;
             }
+        }
+
         if (this.config.algorithm === 'crabwalk') {
             const wTrans = this.config.translationWeight;
             const wLat = this.config.lateralWeight;
