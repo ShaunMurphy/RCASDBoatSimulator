@@ -355,6 +355,11 @@ input[type="range"]::-webkit-slider-thumb:hover {
     grid-template-columns: 180px 1fr 180px;
     gap: 15px;
     padding: 15px 20px;
+    transition: grid-template-columns var(--transition-medium);
+}
+
+.controller-dock.dual-stick {
+    grid-template-columns: 290px 1fr 180px;
 }
 
 .rc-transmitter-body {

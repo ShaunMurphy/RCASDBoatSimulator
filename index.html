@@ -114,6 +114,28 @@
                         </div>
                     </div>
 
+                    <div class="config-group" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 10px;">
+                        <div class="config-label-row">
+                            <span class="label-text">Transmitter Configuration <span class="help-tooltip" data-tooltip="Switch between 2-channel (single stick) and 4-channel (dual sticks) transmitter setups.">?</span></span>
+                        </div>
+                        <select id="selectChannelMode" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12px; font-weight: 500; outline: none; cursor: pointer; width: 100%;">
+                            <option value="2">2-Channel (Single Stick)</option>
+                            <option value="4">4-Channel (Dual Stick)</option>
+                        </select>
+                    </div>
+
+                    <div class="config-group" id="groupAuxMode" style="display: none; margin-top: 10px;">
+                        <div class="config-label-row">
+                            <span class="label-text">Auxiliary Control Mode <span class="help-tooltip" data-tooltip="Defines what the secondary gimbal (Left Stick) controls. Sway: horizontal slide. Spin: turning rotation.">?</span></span>
+                        </div>
+                        <select id="selectAuxMode" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12px; font-weight: 500; outline: none; cursor: pointer; width: 100%;">
+                            <option value="none">Disabled (Left Stick Off)</option>
+                            <option value="sway_spin">Sway & Spin (Left X = Sway, Left Y = Spin)</option>
+                            <option value="sway">Sway Only (Left X = Sway)</option>
+                            <option value="spin">Spin Only (Left Y = Spin)</option>
+                        </select>
+                    </div>
+
                     <div class="switch-row" style="margin-top: 5px;">
                         <span class="switch-label">Invert Steering Direction <span class="help-tooltip" data-tooltip="Inverts the yaw steering direction. When enabled, left stick inputs turn the boat clockwise.">?</span></span>
                         <label class="switch">
@@ -296,24 +318,46 @@
             <!-- RC Controller & Stats bar -->
             <div class="panel controller-dock">
                 <!-- 1. RC Transmitter Gimbal -->
-                <div class="rc-transmitter-body">
+                <div class="rc-transmitter-body" id="rcTransmitterBody">
                     <div class="rc-antenna"></div>
                     <div class="rc-logo">Transmitter</div>
-                    <div class="gimbal-well" id="gimbalWell">
-                        <div class="gimbal-crosshair"></div>
-                        <div class="gimbal-stick" id="gimbalStick"></div>
+                    <div class="gimbals-container" style="display: flex; gap: 24px; align-items: center; justify-content: center; width: 100%;">
+                        <!-- Left Gimbal (hidden by default) -->
+                        <div class="gimbal-container-left" id="gimbalContainerLeft" style="display: none; flex-direction: column; align-items: center; gap: 6px;">
+                            <span style="font-size: 8px; font-family: var(--font-mono); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Left Stick (Aux)</span>
+                            <div class="gimbal-well" id="gimbalWellLeft">
+                                <div class="gimbal-crosshair"></div>
+                                <div class="gimbal-stick" id="gimbalStickLeft"></div>
+                            </div>
+                        </div>
+                        <!-- Right Gimbal (representing primary controls) -->
+                        <div class="gimbal-container-right" id="gimbalContainerRight" style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+                            <span id="labelRightStick" style="font-size: 8px; font-family: var(--font-mono); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; display: none;">Right Stick (Primary)</span>
+                            <div class="gimbal-well" id="gimbalWell">
+                                <div class="gimbal-crosshair"></div>
+                                <div class="gimbal-stick" id="gimbalStick"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 2. Diagnostics Readouts -->
-                <div class="controller-readouts">
-                    <div class="readout-card active" id="cardCh1">
-                        <span class="readout-title">CH1: Steering (Yaw)</span>
+                <div class="controller-readouts" id="controllerReadouts" style="display: flex; gap: 8px; flex-wrap: wrap; width: 100%;">
+                    <div class="readout-card active" id="cardCh1" style="flex: 1; min-width: 100px;">
+                        <span class="readout-title">CH1: Steer (Primary)</span>
                         <div class="readout-value" id="txtCh1">1500 <span>&mu;s</span></div>
                     </div>
-                    <div class="readout-card active" id="cardCh2">
-                        <span class="readout-title">CH2: Throttle (Speed)</span>
+                    <div class="readout-card active" id="cardCh2" style="flex: 1; min-width: 100px;">
+                        <span class="readout-title">CH2: Throttle (Primary)</span>
                         <div class="readout-value" id="txtCh2">1500 <span>&mu;s</span></div>
+                    </div>
+                    <div class="readout-card" id="cardCh3" style="display: none; flex: 1; min-width: 100px;">
+                        <span class="readout-title">CH3: Sway (Left Stick X)</span>
+                        <div class="readout-value" id="txtCh3">1500 <span>&mu;s</span></div>
+                    </div>
+                    <div class="readout-card" id="cardCh4" style="display: none; flex: 1; min-width: 100px;">
+                        <span class="readout-title">CH4: Spin (Left Stick Y)</span>
+                        <div class="readout-value" id="txtCh4">1500 <span>&mu;s</span></div>
                     </div>
                 </div>
 

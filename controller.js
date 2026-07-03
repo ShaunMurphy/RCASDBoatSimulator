@@ -208,6 +208,8 @@ export class ASDController {
             rotationWeight: 0.8,          // Longitudinal differential steering weight
             translationWeight: 1.0,       // Forward/backward throttle weight
             lateralWeight: 0.7,            // Lateral thrust vectoring weight (for 'vectored' mode)
+            channels: 2,                  // 2 or 4 channels
+            auxMode: 'none',              // 'none', 'sway_spin', 'sway', 'spin'
         };
 
         // Custom Algorithms Registry
@@ -217,6 +219,8 @@ export class ASDController {
         this.rcIn = {
             ch1: 1500, // Steering PWM (1000 - 2000, 1500 neutral) - Right / Left
             ch2: 1500, // Throttle PWM (1000 - 2000, 1500 neutral) - Up / Down
+            ch3: 1500, // Aux Sway PWM (1000 - 2000, 1500 neutral) - Left / Right slide
+            ch4: 1500, // Aux Spin PWM (1000 - 2000, 1500 neutral) - Up / Down spin
         };
 
         // Outputs calculated by the microcontroller
@@ -251,9 +255,11 @@ export class ASDController {
     /**
      * Set the RC input PWM values (typically 1000us - 2000us)
      */
-    setInputs(ch1_steering, ch2_throttle) {
+    setInputs(ch1_steering, ch2_throttle, ch3_sway = 1500, ch4_spin = 1500) {
         this.rcIn.ch1 = this.clamp(ch1_steering, 1000, 2000);
         this.rcIn.ch2 = this.clamp(ch2_throttle, 1000, 2000);
+        this.rcIn.ch3 = this.clamp(ch3_sway, 1000, 2000);
+        this.rcIn.ch4 = this.clamp(ch4_spin, 1000, 2000);
     }
 
     /**
@@ -309,6 +315,13 @@ export class ASDController {
         // 1. Normalize RC inputs to range [-1.0, 1.0]
         let x = (this.rcIn.ch1 - 1500) / 500.0;
         let y = (this.rcIn.ch2 - 1500) / 500.0;
+        
+        let x_aux = 0.0;
+        let y_aux = 0.0;
+        if (this.config.channels === 4) {
+            x_aux = (this.rcIn.ch3 - 1500) / 500.0;
+            y_aux = (this.rcIn.ch4 - 1500) / 500.0;
+        }
 
         // Apply steering inversion
         if (this.config.invertSteering) {
@@ -318,15 +331,29 @@ export class ASDController {
         // Apply deadzone
         if (Math.abs(x) < this.config.deadzone) x = 0.0;
         if (Math.abs(y) < this.config.deadzone) y = 0.0;
+        if (Math.abs(x_aux) < this.config.deadzone) x_aux = 0.0;
+        if (Math.abs(y_aux) < this.config.deadzone) y_aux = 0.0;
 
         // 2. Run selected mixing mode
-        this.mixASD(x, y);
+        this.mixASD(x, y, x_aux, y_aux);
     }
 
     /**
      * ASD Control mixing (incorporating differential and lateral vectored thrust)
      */
-    mixASD(x, y) {
+    mixASD(x, y, x_aux = 0.0, y_aux = 0.0) {
+        // Determine auxiliary sway and spin components
+        let sway = 0.0;
+        let spin = 0.0;
+        if (this.config.channels === 4) {
+            if (this.config.auxMode === 'sway_spin' || this.config.auxMode === 'sway') {
+                sway = x_aux;
+            }
+            if (this.config.auxMode === 'sway_spin' || this.config.auxMode === 'spin') {
+                spin = y_aux;
+            }
+        }
+
         // Handle custom algorithms
         if (this.config.algorithm.startsWith('custom_')) {
             const customAlgo = this.customAlgorithms[this.config.algorithm];
@@ -335,6 +362,10 @@ export class ASDController {
                     const vars = {
                         x: x,
                         y: y,
+                        x_aux: x_aux,
+                        y_aux: y_aux,
+                        sway: sway,
+                        spin: spin,
                         toeangle: this.config.maxToeIn,
                         transweight: this.config.translationWeight,
                         rotweight: this.config.rotationWeight,
@@ -352,6 +383,7 @@ export class ASDController {
                 } catch(err) {
                     console.error("Runtime error in custom algorithm evaluation:", err);
                 }
+                return;
             }
         }
 
@@ -360,33 +392,47 @@ export class ASDController {
             const wLat = this.config.lateralWeight;
             const k = 4.2667; // Lever arm ratio -thrusterDistY / thrusterDistX
             
-            let Ax = (x * wLat) / 2.0;
-            let AyL = (y * wTrans + k * x * wLat) / 2.0;
-            let AyR = (y * wTrans - k * x * wLat) / 2.0;
+            // Combine primary and auxiliary sway/spin components for crabwalk
+            const totalSway = x + sway;
+            const totalSpin = spin;
             
-            let sL = Math.sqrt(Ax * Ax + AyL * AyL);
-            let sR = Math.sqrt(Ax * Ax + AyR * AyR);
+            let Ax = (totalSway * wLat) / 2.0;
+            let AyL = (y * wTrans + k * totalSway * wLat) / 2.0;
+            let AyR = (y * wTrans - k * totalSway * wLat) / 2.0;
+            
+            // Add spin (yaw turning torque) component to forward components
+            const fL_rot_y = totalSpin * this.config.rotationWeight;
+            const fR_rot_y = -totalSpin * this.config.rotationWeight;
+            
+            let fL_x = Ax;
+            let fL_y = AyL + fL_rot_y;
+            let fR_x = Ax;
+            let fR_y = AyR + fR_rot_y;
+            
+            let sL = Math.sqrt(fL_x * fL_x + fL_y * fL_y);
+            let sR = Math.sqrt(fR_x * fR_x + fR_y * fR_y);
             
             const maxS = Math.max(sL, sR);
             if (maxS > 1.0) {
                 sL /= maxS;
                 sR /= maxS;
-                Ax /= maxS;
-                AyL /= maxS;
-                AyR /= maxS;
+                fL_x /= maxS;
+                fL_y /= maxS;
+                fR_x /= maxS;
+                fR_y /= maxS;
             }
             
             this.microOut.escLeftTargetSpeed = sL;
             this.microOut.escRightTargetSpeed = sR;
             
             if (sL > 0.005) {
-                this.microOut.servoLeftTargetAngle = Math.atan2(Ax, AyL);
+                this.microOut.servoLeftTargetAngle = Math.atan2(fL_x, fL_y);
             } else {
                 this.microOut.servoLeftTargetAngle = 0.0;
             }
             
             if (sR > 0.005) {
-                this.microOut.servoRightTargetAngle = Math.atan2(Ax, AyR);
+                this.microOut.servoRightTargetAngle = Math.atan2(fR_x, fR_y);
             } else {
                 this.microOut.servoRightTargetAngle = 0.0;
             }
@@ -422,22 +468,50 @@ export class ASDController {
 
         // --- B. Compute Steering Force Components ---
         // 1. Longitudinal differential forces (creates turning torque like a tank)
-        const fL_rot_y = x * wRot;
-        const fR_rot_y = -x * wRot;
+        // Combining primary steering (x) and auxiliary spin (spin)
+        const fL_rot_y = (x + spin) * wRot;
+        const fR_rot_y = -(x + spin) * wRot;
 
         // 2. Lateral vectored forces (vectors pods sideways to swing the stern)
-        const fL_rot_x = -x * wLat;
-        const fR_rot_x = -x * wLat;
+        // If differential algorithm, wLat is 0.0, so no lateral component.
+        const fL_rot_x = -(x + spin) * wLat;
+        const fR_rot_x = -(x + spin) * wLat;
+
+        // 3. Sway component (adds pure lateral sliding with zero torque)
+        // Only active if algorithm is vectored (wLat > 0)
+        let fL_sway_x = 0.0;
+        let fL_sway_y = 0.0;
+        let fR_sway_x = 0.0;
+        let fR_sway_y = 0.0;
+        
+        if (wLat > 0.0) {
+            const k = 4.2667;
+            fL_sway_x = (sway * wLat) / 2.0;
+            fL_sway_y = (k * sway * wLat) / 2.0;
+            
+            fR_sway_x = (sway * wLat) / 2.0;
+            fR_sway_y = (-k * sway * wLat) / 2.0;
+        }
 
         // --- C. Vector Superposition ---
-        const fL_x = fL_trans_x + fL_rot_x;
-        const fL_y = fL_trans_y + fL_rot_y;
-        const fR_x = fR_trans_x + fR_rot_x;
-        const fR_y = fR_trans_y + fR_rot_y;
+        let fL_x = fL_trans_x + fL_rot_x + fL_sway_x;
+        let fL_y = fL_trans_y + fL_rot_y + fL_sway_y;
+        let fR_x = fR_trans_x + fR_rot_x + fR_sway_x;
+        let fR_y = fR_trans_y + fR_rot_y + fR_sway_y;
 
-        // --- D. Target Speeds (Force Magnitudes) ---
-        const sL_target = Math.sqrt(fL_x * fL_x + fL_y * fL_y);
-        const sR_target = Math.sqrt(fR_x * fR_x + fR_y * fR_y);
+        // --- D. Target Speeds (Force Magnitudes) & Scaling ---
+        let sL_target = Math.sqrt(fL_x * fL_x + fL_y * fL_y);
+        let sR_target = Math.sqrt(fR_x * fR_x + fR_y * fR_y);
+
+        const maxS = Math.max(sL_target, sR_target);
+        if (maxS > 1.0) {
+            sL_target /= maxS;
+            sR_target /= maxS;
+            fL_x /= maxS;
+            fL_y /= maxS;
+            fR_x /= maxS;
+            fR_y /= maxS;
+        }
 
         this.microOut.escLeftTargetSpeed = this.clamp(sL_target, 0.0, 1.0);
         this.microOut.escRightTargetSpeed = this.clamp(sR_target, 0.0, 1.0);

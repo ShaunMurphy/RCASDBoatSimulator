@@ -93,6 +93,20 @@ const txtCh2 = document.getElementById('txtCh2');
 const cardCh1 = document.getElementById('cardCh1');
 const cardCh2 = document.getElementById('cardCh2');
 
+// 4-Channel DOM Elements
+const selectChannelMode = document.getElementById('selectChannelMode');
+const selectAuxMode = document.getElementById('selectAuxMode');
+const groupAuxMode = document.getElementById('groupAuxMode');
+const gimbalWellLeft = document.getElementById('gimbalWellLeft');
+const gimbalStickLeft = document.getElementById('gimbalStickLeft');
+const gimbalContainerLeft = document.getElementById('gimbalContainerLeft');
+const gimbalContainerRight = document.getElementById('gimbalContainerRight');
+const labelRightStick = document.getElementById('labelRightStick');
+const txtCh3 = document.getElementById('txtCh3');
+const txtCh4 = document.getElementById('txtCh4');
+const cardCh3 = document.getElementById('cardCh3');
+const cardCh4 = document.getElementById('cardCh4');
+
 // Dynamic stats
 const statSpeed = document.getElementById('statSpeed');
 const statHeading = document.getElementById('statHeading');
@@ -153,7 +167,9 @@ let lastFrameTime = performance.now();
 let fps = 60;
 let showObstacles = true;
 let isDraggingJoystick = false;
+let isDraggingJoystickLeft = false;
 let joystickVal = { x: 0.0, y: 0.0 }; // Normalized (-1.0 to 1.0)
+let joystickValLeft = { x: 0.0, y: 0.0 }; // Normalized (-1.0 to 1.0)
 let keyboardTarget = { x: 0.0, y: 0.0 }; // Joystick destination target from keys
 let activeKeys = {};
 
@@ -183,6 +199,35 @@ function applyConfig() {
     controller.config.translationWeight = parseFloat(slideTransWeight.value);
     controller.config.rotationWeight = parseFloat(slideRotWeight.value);
     controller.config.lateralWeight = parseFloat(slideLatWeight.value);
+
+    // 4-Channel settings
+    const channels = parseInt(selectChannelMode.value);
+    controller.config.channels = channels;
+    controller.config.auxMode = selectAuxMode.value;
+
+    const is4ch = (channels === 4);
+    groupAuxMode.style.display = is4ch ? 'flex' : 'none';
+
+    // Show/hide left stick container and stick labels
+    gimbalContainerLeft.style.display = is4ch ? 'flex' : 'none';
+    labelRightStick.style.display = is4ch ? 'inline-block' : 'none';
+
+    // Toggle controller-dock style for dual-gimbal spacing
+    const dock = document.querySelector('.controller-dock');
+    if (dock) {
+        dock.classList.toggle('dual-stick', is4ch);
+    }
+
+    // Show/hide Ch3/Ch4 readout cards
+    cardCh3.style.display = is4ch ? 'flex' : 'none';
+    cardCh4.style.display = is4ch ? 'flex' : 'none';
+
+    // If switching back to 2ch, reset left stick inputs to center (1500us)
+    if (!is4ch) {
+        joystickValLeft.x = 0.0;
+        joystickValLeft.y = 0.0;
+        updateVisualJoystickLeft(0.0, 0.0);
+    }
 
     // Show/hide Edit/Delete buttons for custom modes
     const isCustom = controller.config.algorithm.startsWith('custom_');
@@ -348,6 +393,20 @@ selectPlatform.addEventListener('change', () => {
     }
 });
 
+selectChannelMode.addEventListener('change', () => {
+    applyConfig();
+    if (tabCode.classList.contains('active')) {
+        renderArduinoCode();
+    }
+});
+
+selectAuxMode.addEventListener('change', () => {
+    applyConfig();
+    if (tabCode.classList.contains('active')) {
+        renderArduinoCode();
+    }
+});
+
 // Theme System (Light / Dark Mode switcher)
 function setTheme(theme) {
     if (theme === 'light') {
@@ -475,6 +534,78 @@ gimbalWell.addEventListener('pointercancel', () => {
     isDraggingJoystick = false;
 });
 
+function handleJoystickMoveLeft(clientX, clientY) {
+    const rect = gimbalWellLeft.getBoundingClientRect();
+    const radius = rect.width / 2.0;
+    const centerX = rect.left + radius;
+    const centerY = rect.top + radius;
+
+    let dx = clientX - centerX;
+    let dy = clientY - centerY;
+
+    let normX = dx / radius;
+    let normY = -dy / radius;
+
+    const dist = Math.sqrt(normX * normX + normY * normY);
+    if (dist > 1.0) {
+        normX /= dist;
+        normY /= dist;
+    }
+
+    joystickValLeft.x = normX;
+    joystickValLeft.y = normY;
+
+    updateVisualJoystickLeft(normX, normY);
+}
+
+function updateVisualJoystickLeft(normX, normY) {
+    const maxOffset = 40;
+    const visualX = normX * maxOffset;
+    const visualY = -normY * maxOffset;
+
+    gimbalStickLeft.style.left = `calc(50% + ${visualX}px)`;
+    gimbalStickLeft.style.top = `calc(50% + ${visualY}px)`;
+
+    const ch3_pwm = Math.round(1500 + normX * 500);
+    const ch4_pwm = Math.round(1500 + normY * 500);
+
+    txtCh3.innerHTML = `${ch3_pwm} <span>&mu;s</span>`;
+    txtCh4.innerHTML = `${ch4_pwm} <span>&mu;s</span>`;
+
+    if (Math.abs(normX) > 0.02) cardCh3.classList.add('active');
+    else cardCh3.classList.remove('active');
+    
+    if (Math.abs(normY) > 0.02) cardCh4.classList.add('active');
+    else cardCh4.classList.remove('active');
+}
+
+gimbalWellLeft.addEventListener('pointerdown', (e) => {
+    isDraggingJoystickLeft = true;
+    gimbalWellLeft.setPointerCapture(e.pointerId);
+    handleJoystickMoveLeft(e.clientX, e.clientY);
+});
+
+gimbalWellLeft.addEventListener('pointermove', (e) => {
+    if (isDraggingJoystickLeft) {
+        handleJoystickMoveLeft(e.clientX, e.clientY);
+    }
+});
+
+gimbalWellLeft.addEventListener('pointerup', (e) => {
+    isDraggingJoystickLeft = false;
+    gimbalWellLeft.releasePointerCapture(e.pointerId);
+    joystickValLeft.x = 0.0;
+    joystickValLeft.y = 0.0;
+    updateVisualJoystickLeft(0.0, 0.0);
+});
+
+gimbalWellLeft.addEventListener('pointercancel', () => {
+    isDraggingJoystickLeft = false;
+    joystickValLeft.x = 0.0;
+    joystickValLeft.y = 0.0;
+    updateVisualJoystickLeft(0.0, 0.0);
+});
+
 // Keyboard Mapping
 window.addEventListener('keydown', (e) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD'].includes(e.code)) {
@@ -574,7 +705,9 @@ function loop(timeNow) {
     // 2. Feed joystick values as PWM to Microcontroller controller
     const ch1_pwm = 1500 + joystickVal.x * 500;
     const ch2_pwm = 1500 + joystickVal.y * 500;
-    controller.setInputs(ch1_pwm, ch2_pwm);
+    const ch3_pwm = 1500 + joystickValLeft.x * 500;
+    const ch4_pwm = 1500 + joystickValLeft.y * 500;
+    controller.setInputs(ch1_pwm, ch2_pwm, ch3_pwm, ch4_pwm);
 
     // 3. Run Microcontroller logic calculations
     controller.updateMixing();
@@ -1134,6 +1267,8 @@ function updateDiagnosticsDisplay() {
 // Code panel text rendering with syntax highlighting based on active platform and mixing mode
 function renderArduinoCode() {
     const isESP32 = selectPlatform.value === 'esp32';
+    const is4ch = selectChannelMode.value === '4';
+    const auxMode = selectAuxMode.value;
     
     let modeName = 'ASD Vectored (Vectored + Diff)';
     if (selectAlgorithm.value === 'differential') {
@@ -1145,7 +1280,24 @@ function renderArduinoCode() {
         modeName = algo ? `Custom: ${algo.name}` : 'Custom Algorithm';
     }
     
+    if (is4ch) {
+        modeName += ` with 4-Channel Control (Aux: ${auxMode.toUpperCase().replace('_', ' & ')})`;
+    }
+    
     let loopCode = '';
+    
+    let swaySpinCode = '';
+    if (is4ch) {
+        swaySpinCode = `  // 2. Compute Auxiliary Sway and Spin Components
+  float sway = 0.0;
+  float spin = 0.0;
+  if (${auxMode === 'sway_spin' || auxMode === 'sway'}) {
+    sway = x_aux;
+  }
+  if (${auxMode === 'sway_spin' || auxMode === 'spin'}) {
+    spin = y_aux;
+  }`;
+    }
     
     if (selectAlgorithm.value.startsWith('custom_')) {
         const algo = controller.customAlgorithms[selectAlgorithm.value];
@@ -1155,14 +1307,14 @@ function renderArduinoCode() {
             let eqSpeedL = algo.eqEscL.toLowerCase().replace(/pi/g, 'PI').replace(/toeangle/g, 'MAX_TOE_IN').replace(/transweight/g, 'W_TRANS').replace(/rotweight/g, 'W_ROT').replace(/latweight/g, 'W_LAT');
             let eqSpeedR = algo.eqEscR.toLowerCase().replace(/pi/g, 'PI').replace(/toeangle/g, 'MAX_TOE_IN').replace(/transweight/g, 'W_TRANS').replace(/rotweight/g, 'W_ROT').replace(/latweight/g, 'W_LAT');
 
-            loopCode = `  // 2. Custom User Logic Equations (Translated to C++)
+            loopCode = `  ${is4ch ? swaySpinCode + '\n\n' : ''}// 3. Custom User Logic Equations (Translated to C++)
   targetAngleL = ${eqL};
   targetAngleR = ${eqR};
   targetSpeedL = ${eqSpeedL};
   targetSpeedR = ${eqSpeedR};`;
         }
     } else if (selectAlgorithm.value === 'vectored') {
-        loopCode = `  // 2. Compute Translation Force Components
+        loopCode = `  ${is4ch ? swaySpinCode + '\n\n' : ''}// 3. Compute Translation Force Components
   float s_trans = abs(y) * ${slideTransWeight.value};
   float alpha = 0.0;
   if (y >= 0) {
@@ -1178,53 +1330,85 @@ function renderArduinoCode() {
   float fR_trans_x = s_trans * sin(thetaR_trans);
   float fR_trans_y = s_trans * cos(thetaR_trans);
 
-  // 3. Compute Rotation Force Components (Torque & Lateral Thrust)
-  // Steering right (x > 0) -> Left forward (positive y), Right backward (negative y)
-  // Plus lateral thrust to the left (negative x) to swing the stern
-  float fL_rot_y = x * ${slideRotWeight.value};
-  float fR_rot_y = -x * ${slideRotWeight.value};
-  float fL_rot_x = -x * ${slideLatWeight.value};
-  float fR_rot_x = -x * ${slideLatWeight.value};
+  // 4. Compute Rotation Force Components (Primary Steering + Aux Spin)
+  float fL_rot_y = (x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
+  float fR_rot_y = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
+  float fL_rot_x = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideLatWeight.value};
+  float fR_rot_x = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideLatWeight.value};
 
-  // 4. Vector Addition / Superposition
-  float fL_x = fL_trans_x + fL_rot_x;
-  float fL_y = fL_trans_y + fL_rot_y;
-  float fR_x = fR_trans_x + fR_rot_x;
-  float fR_y = fR_trans_y + fR_rot_y;
+  // 5. Compute Sway Force Components (Pure Lateral Slide)
+  float fL_sway_x = 0.0;
+  float fL_sway_y = 0.0;
+  float fR_sway_x = 0.0;
+  float fR_sway_y = 0.0;
+  if (${is4ch}) {
+    float k = 4.2667;
+    fL_sway_x = (sway * ${slideLatWeight.value}) / 2.0;
+    fL_sway_y = (k * sway * ${slideLatWeight.value}) / 2.0;
+    fR_sway_x = (sway * ${slideLatWeight.value}) / 2.0;
+    fR_sway_y = (-k * sway * ${slideLatWeight.value}) / 2.0;
+  }
 
-  // 5. Calculate Target Angles and Speed magnitudes
-  float targetSpeedL = constrain(sqrt(fL_x*fL_x + fL_y*fL_y), 0.0, 1.0);
-  float targetSpeedR = constrain(sqrt(fR_x*fR_x + fR_y*fR_y), 0.0, 1.0);
+  // 6. Vector Superposition
+  float fL_x = fL_trans_x + fL_rot_x + fL_sway_x;
+  float fL_y = fL_trans_y + fL_rot_y + fL_sway_y;
+  float fR_x = fR_trans_x + fR_rot_x + fR_sway_x;
+  float fR_y = fR_trans_y + fR_rot_y + fR_sway_y;
+
+  // 7. Calculate Target Angles and Speed magnitudes (Symmetric Scaling)
+  float targetSpeedL = sqrt(fL_x*fL_x + fL_y*fL_y);
+  float targetSpeedR = sqrt(fR_x*fR_x + fR_y*fR_y);
+  float maxS = max(targetSpeedL, targetSpeedR);
+  if (maxS > 1.0) {
+    targetSpeedL /= maxS;
+    targetSpeedR /= maxS;
+    fL_x /= maxS;
+    fL_y /= maxS;
+    fR_x /= maxS;
+    fR_y /= maxS;
+  }
 
   float targetAngleL = (targetSpeedL > 0.005) ? atan2(fL_x, fL_y) : thetaL_trans;
   float targetAngleR = (targetSpeedR > 0.005) ? atan2(fR_x, fR_y) : thetaR_trans;`;
     } else if (selectAlgorithm.value === 'crabwalk') {
-        loopCode = `  // 2. Compute Translation Components (Crabwalk Mode)
+        loopCode = `  ${is4ch ? swaySpinCode + '\n\n' : ''}// 3. Compute Translation Components (Crabwalk Mode)
   float wTrans = ${slideTransWeight.value};
   float wLat = ${slideLatWeight.value};
   float k = 4.2667; // Lever arm ratio -thrusterDistY / thrusterDistX
 
-  float Ax = (x * wLat) / 2.0;
-  float AyL = (y * wTrans + k * x * wLat) / 2.0;
-  float AyR = (y * wTrans - k * x * wLat) / 2.0;
+  float totalSway = x + ${is4ch ? 'sway' : '0.0'};
+  float totalSpin = ${is4ch ? 'spin' : '0.0'};
 
-  float targetSpeedL = sqrt(Ax * Ax + AyL * AyL);
-  float targetSpeedR = sqrt(Ax * Ax + AyR * AyR);
+  float Ax = (totalSway * wLat) / 2.0;
+  float AyL = (y * wTrans + k * totalSway * wLat) / 2.0;
+  float AyR = (y * wTrans - k * totalSway * wLat) / 2.0;
+
+  float fL_rot_y = totalSpin * ${slideRotWeight.value};
+  float fR_rot_y = -totalSpin * ${slideRotWeight.value};
+
+  float fL_x = Ax;
+  float fL_y = AyL + fL_rot_y;
+  float fR_x = Ax;
+  float fR_y = AyR + fR_rot_y;
+
+  float targetSpeedL = sqrt(fL_x * fL_x + fL_y * fL_y);
+  float targetSpeedR = sqrt(fR_x * fR_x + fR_y * fR_y);
 
   // Scale speeds proportionally if either exceeds 1.0 to preserve zero yaw torque ratio
   float maxS = max(targetSpeedL, targetSpeedR);
   if (maxS > 1.0) {
     targetSpeedL /= maxS;
     targetSpeedR /= maxS;
-    Ax /= maxS;
-    AyL /= maxS;
-    AyR /= maxS;
+    fL_x /= maxS;
+    fL_y /= maxS;
+    fR_x /= maxS;
+    fR_y /= maxS;
   }
 
-  float targetAngleL = (targetSpeedL > 0.005) ? atan2(Ax, AyL) : 0.0;
-  float targetAngleR = (targetSpeedR > 0.005) ? atan2(Ax, AyR) : 0.0;`;
+  float targetAngleL = (targetSpeedL > 0.005) ? atan2(fL_x, fL_y) : 0.0;
+  float targetAngleR = (targetSpeedR > 0.005) ? atan2(fR_x, fR_y) : 0.0;`;
     } else {
-        loopCode = `  // 2. Compute Translation Force Components
+        loopCode = `  ${is4ch ? swaySpinCode + '\n\n' : ''}// 3. Compute Translation Force Components
   float s_trans = abs(y) * ${slideTransWeight.value};
   float alpha = 0.0;
   if (y >= 0) {
@@ -1240,18 +1424,17 @@ function renderArduinoCode() {
   float fR_trans_x = s_trans * sin(thetaR_trans);
   float fR_trans_y = s_trans * cos(thetaR_trans);
 
-  // 3. Compute Rotation Force Components (Longitudinal differential only)
-  // Steering right (x > 0) -> Left forward (positive y), Right backward (negative y)
-  float fL_rot_y = x * ${slideRotWeight.value};
-  float fR_rot_y = -x * ${slideRotWeight.value};
+  // 4. Compute Rotation Force Components (Longitudinal differential + Aux Spin)
+  float fL_rot_y = (x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
+  float fR_rot_y = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
 
-  // 4. Vector Addition / Superposition (No lateral rotation component)
+  // 5. Vector Addition / Superposition
   float fL_x = fL_trans_x;
   float fL_y = fL_trans_y + fL_rot_y;
   float fR_x = fR_trans_x;
   float fR_y = fR_trans_y + fR_rot_y;
 
-  // 5. Calculate Target Angles and Speed magnitudes
+  // 6. Calculate Target Angles and Speed magnitudes
   float targetSpeedL = constrain(sqrt(fL_x*fL_x + fL_y*fL_y), 0.0, 1.0);
   float targetSpeedR = constrain(sqrt(fR_x*fR_x + fR_y*fR_y), 0.0, 1.0);
 
@@ -1262,16 +1445,42 @@ function renderArduinoCode() {
     let code = '';
 
     if (!isESP32) {
-        // Arduino code
+        // Arduino code definitions
+        let pinDecls = `const int CH1_STEER_PIN = 2;
+const int CH2_THROT_PIN = 3;`;
+        let readCode = `  long ch1 = pulseIn(CH1_STEER_PIN, HIGH, 25000);
+  long ch2 = pulseIn(CH2_THROT_PIN, HIGH, 25000);`;
+        let fallbackCode = `  if (ch1 == 0) ch1 = 1500;
+  if (ch2 == 0) ch2 = 1500;`;
+        let normCode = `  float x = (ch1 - 1500) / 500.0;
+  float y = (ch2 - 1500) / 500.0;`;
+        let constrainCode = `  x = constrain(x, -1.0, 1.0);
+  y = constrain(y, -1.0, 1.0);`;
+        let deadzoneCode = `  if (abs(x) < 0.02) x = 0.0;
+  if (abs(y) < 0.02) y = 0.0;`;
+
+        if (is4ch) {
+            pinDecls += `\nconst int CH3_SWAY_PIN = 4;
+const int CH4_SPIN_PIN = 7;`;
+            readCode += `\n  long ch3 = pulseIn(CH3_SWAY_PIN, HIGH, 25000);
+  long ch4 = pulseIn(CH4_SPIN_PIN, HIGH, 25000);`;
+            fallbackCode += `\n  if (ch3 == 0) ch3 = 1500;
+  if (ch4 == 0) ch4 = 1500;`;
+            normCode += `\n  float x_aux = (ch3 - 1500) / 500.0;
+  float y_aux = (ch4 - 1500) / 500.0;`;
+            constrainCode += `\n  x_aux = constrain(x_aux, -1.0, 1.0);
+  y_aux = constrain(y_aux, -1.0, 1.0);`;
+            deadzoneCode += `\n  if (abs(x_aux) < 0.02) x_aux = 0.0;
+  if (abs(y_aux) < 0.02) y_aux = 0.0;`;
+        }
+
         code = `
 <span class="code-comment">// ASD Thruster Mixing System for Arduino Uno (AVR)</span>
-<span class="code-comment">// Converts 2 RC channels (Steering, Throttle) to 2 Azimuth Pods</span>
+<span class="code-comment">// Converts RC channels to 2 Azimuth Pods</span>
 <span class="code-comment">// Selected Mode: ${modeName}</span>
 
 #include &lt;Servo.h&gt;
 
-<span class="code-comment">// Pin Assignments</span>
-<span class="code-type">const int</span> CH1_STEER_PIN = <span class="code-number">2</span>;
 <span class="code-type">const int</span> CH2_THROT_PIN = <span class="code-number">3</span>;
 
 <span class="code-type">const int</span> SERVO_L_PIN = <span class="code-number">9</span>;
