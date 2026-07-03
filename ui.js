@@ -264,8 +264,52 @@ sliders.forEach(slider => {
     });
 });
 
+function updateAlgorithmTooltip() {
+    const algo = selectAlgorithm.value;
+    let text = '';
+    if (algo === 'vectored') {
+        text = 'Vectored Mode Equations:\n' +
+               '• Left Servo = atan2(fL_x, fL_y)\n' +
+               '• Right Servo = atan2(fR_x, fR_y)\n' +
+               '• Left ESC = sqrt(fL_x² + fL_y²)\n' +
+               '• Right ESC = sqrt(fR_x² + fR_y²)\n' +
+               'where forces are a vector combination of translation, rotation & lateral vector components.';
+    } else if (algo === 'differential') {
+        text = 'Differential Mode Equations:\n' +
+               '• Left Servo = -toeangle\n' +
+               '• Right Servo = toeangle\n' +
+               '• Left ESC = y * transweight + x * rotweight\n' +
+               '• Right ESC = y * transweight - x * rotweight';
+    } else if (algo === 'crabwalk') {
+        text = 'Crab Walk Equations (k = 4.2667):\n' +
+               '• Ax = (x * latweight) / 2\n' +
+               '• AyL = (y * transweight + k * x * latweight) / 2\n' +
+               '• AyR = (y * transweight - k * x * latweight) / 2\n' +
+               '• L/R Servo = atan2(Ax, AyL/R)\n' +
+               '• L/R ESC = sqrt(Ax² + AyL/R²)\n' +
+               '(speeds scaled down if either exceeds 1.0)';
+    } else if (algo.startsWith('custom_')) {
+        const customAlgo = controller.customAlgorithms[algo];
+        if (customAlgo) {
+            text = 'Custom Mode Equations:\n' +
+                   `• Left Servo = ${customAlgo.eqServoL}\n` +
+                   `• Right Servo = ${customAlgo.eqServoR}\n` +
+                   `• Left ESC = ${customAlgo.eqEscL}\n` +
+                   `• Right ESC = ${customAlgo.eqEscR}`;
+        } else {
+            text = 'Custom equations loaded from localStorage.';
+        }
+    }
+    
+    const tooltip = document.getElementById('tooltipAlgorithm');
+    if (tooltip) {
+        tooltip.setAttribute('data-tooltip', text);
+    }
+}
+
 selectAlgorithm.addEventListener('change', () => {
     applyConfig();
+    updateAlgorithmTooltip();
 });
 
 checkInvertSteer.addEventListener('change', () => {
@@ -1600,6 +1644,7 @@ btnSaveEditor.addEventListener('click', () => {
         }
 
         applyConfig();
+        updateAlgorithmTooltip();
         codeText.innerHTML = ''; // reset cached panel code
         modalEditor.style.display = 'none';
     } catch (err) {
@@ -1617,6 +1662,7 @@ document.querySelectorAll('.widget-title').forEach(title => {
 
 // Initialize Custom Algorithms
 initCustomAlgorithms();
+updateAlgorithmTooltip();
 
 // Start Engine
 applyConfig();

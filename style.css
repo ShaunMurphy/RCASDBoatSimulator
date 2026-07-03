@@ -1099,6 +1099,7 @@ body.light-theme .help-tooltip {
     left: 50% !important;
     transform: translateX(-50%) scale(0.9) !important;
     width: 200px !important;
+    white-space: pre-wrap !important;
     padding: 8px 12px;
     background: rgba(13, 17, 33, 0.96);
     backdrop-filter: blur(12px);
@@ -1349,4 +1350,8 @@ body.light-theme .modal-btn-cancel:hover {
 body.light-theme .modal-guide {
     background: rgba(0, 0, 0, 0.02);
     border-color: rgba(0, 0, 0, 0.06);
+}
+
+.help-tooltip.tooltip-wide::after {
+    width: 320px !important;
 }
