@@ -137,6 +137,18 @@ const valShipRotDrag = document.getElementById('valShipRotDrag');
 const slideRopeLength = document.getElementById('slideRopeLength');
 const valRopeLength = document.getElementById('valRopeLength');
 
+// Single Hand Controller Selectors
+const singleHandContainer = document.getElementById('singleHandContainer');
+const singleHandJoyWell = document.getElementById('singleHandJoyWell');
+const singleHandJoyStick = document.getElementById('singleHandJoyStick');
+const singleHandTriggerWell = document.getElementById('singleHandTriggerWell');
+const singleHandTrigger = document.getElementById('singleHandTrigger');
+const singleHandTriggerFill = document.getElementById('singleHandTriggerFill');
+const dpadUp = document.getElementById('dpadUp');
+const dpadDown = document.getElementById('dpadDown');
+const dpadLeft = document.getElementById('dpadLeft');
+const dpadRight = document.getElementById('dpadRight');
+
 // Tabs & Right Panels
 const tabDiagnostics = document.getElementById('tabDiagnostics');
 const tabCode = document.getElementById('tabCode');
@@ -207,6 +219,8 @@ let fps = 60;
 let showObstacles = true;
 let isDraggingJoystick = false;
 let isDraggingJoystickLeft = false;
+let isDraggingSingleHandJoy = false;
+let isDraggingSingleHandTrigger = false;
 let joystickVal = { x: 0.0, y: 0.0 }; // Normalized (-1.0 to 1.0)
 let joystickValLeft = { x: 0.0, y: 0.0 }; // Normalized (-1.0 to 1.0)
 let keyboardTarget = { x: 0.0, y: 0.0 }; // Joystick destination target from keys
@@ -241,16 +255,25 @@ function applyConfig() {
     controller.config.lateralWeight = parseFloat(slideLatWeight.value);
 
     // 4-Channel settings
-    const channels = parseInt(selectChannelMode.value);
-    controller.config.channels = channels;
+    const channelsVal = selectChannelMode.value;
+    const is4ch = (channelsVal === '4' || channelsVal === '4_single');
+    const is4chDual = (channelsVal === '4');
+    const is4chSingle = (channelsVal === '4_single');
+    const is2ch = (channelsVal === '2');
+
+    controller.config.channels = is4ch ? 4 : 2;
     controller.config.auxMode = selectAuxMode.value;
 
-    const is4ch = (channels === 4);
     groupAuxMode.style.display = is4ch ? 'flex' : 'none';
 
-    // Show/hide left stick container and stick labels
-    gimbalContainerLeft.style.display = is4ch ? 'flex' : 'none';
-    labelRightStick.style.display = is4ch ? 'inline-block' : 'none';
+    // Show/hide gimbal containers and labels
+    gimbalContainerLeft.style.display = is4chDual ? 'flex' : 'none';
+    gimbalContainerRight.style.display = (is2ch || is4chDual) ? 'flex' : 'none';
+    labelRightStick.style.display = is4chDual ? 'inline-block' : 'none';
+    
+    if (singleHandContainer) {
+        singleHandContainer.style.display = is4chSingle ? 'flex' : 'none';
+    }
 
     // Toggle controller-dock style for dual-gimbal spacing
     const dock = document.querySelector('.controller-dock');
@@ -275,7 +298,9 @@ function applyConfig() {
 
     // Update keyboard instructions hint based on mode
     if (keyboardInstructions) {
-        if (is4ch) {
+        if (is4chSingle) {
+            keyboardInstructions.innerHTML = '- Trigger (Throttle): <b>Up/Down Arrows</b> | Steer: <b>Left/Right Arrows</b> | Aux D-Pad: <b>WASD Keys</b>';
+        } else if (is4chDual) {
             keyboardInstructions.innerHTML = '- Left Stick (Aux): <b>WASD Keys</b> | Right Stick: <b>Arrow Keys</b>';
         } else {
             keyboardInstructions.innerHTML = '- Or use <b>WASD / Arrow Keys</b> (returns to center automatically)';
@@ -495,6 +520,10 @@ selectPlatform.addEventListener('change', () => {
 });
 
 selectChannelMode.addEventListener('change', () => {
+    const val = selectChannelMode.value;
+    if (val === '4' || val === '4_single') {
+        selectAuxMode.value = 'sway_spin';
+    }
     applyConfig();
     if (tabCode.classList.contains('active')) {
         renderArduinoCode();
@@ -796,6 +825,122 @@ gimbalWellLeft.addEventListener('pointercancel', () => {
     updateVisualJoystickLeft(0.0, 0.0);
 });
 
+function updateVisualSingleHandJoy(normX) {
+    if (!singleHandJoyStick) return;
+    const maxOffset = 30; // max displacement in pixels inside 90px track
+    const visualX = normX * maxOffset;
+    singleHandJoyStick.style.left = `calc(50% + ${visualX}px)`;
+    singleHandJoyStick.style.top = '50%';
+}
+
+function updateVisualSingleHandTrigger(normY) {
+    if (!singleHandTrigger || !singleHandTriggerFill) return;
+    const pct = (normY + 1.0) * 50.0;
+    singleHandTriggerFill.style.height = `${pct}%`;
+    const handleY = 50 - normY * 40; 
+    singleHandTrigger.style.top = `${handleY}%`;
+}
+
+function updateVisualSingleHandDpad(normX, normY) {
+    if (!dpadUp || !dpadDown || !dpadLeft || !dpadRight) return;
+    dpadUp.classList.toggle('active', normY > 0.15);
+    dpadDown.classList.toggle('active', normY < -0.15);
+    dpadLeft.classList.toggle('active', normX < -0.15);
+    dpadRight.classList.toggle('active', normX > 0.15);
+}
+
+function handleSingleHandJoyMove(clientX) {
+    if (!singleHandJoyWell) return;
+    const rect = singleHandJoyWell.getBoundingClientRect();
+    const radius = rect.width / 2.0;
+    const centerX = rect.left + radius;
+    let dx = clientX - centerX;
+    let normX = Math.max(-1.0, Math.min(dx / 30, 1.0));
+    joystickVal.x = normX;
+    keyboardTarget.x = normX;
+    updateVisualSingleHandJoy(normX);
+}
+
+function handleSingleHandTriggerMove(clientY) {
+    if (!singleHandTriggerWell) return;
+    const rect = singleHandTriggerWell.getBoundingClientRect();
+    const centerY = rect.top + rect.height / 2.0;
+    let dy = centerY - clientY; 
+    let normY = Math.max(-1.0, Math.min(dy / 40, 1.0));
+    joystickVal.y = normY;
+    keyboardTarget.y = normY;
+    updateVisualSingleHandTrigger(normY);
+}
+
+if (singleHandJoyWell) {
+    singleHandJoyWell.addEventListener('pointerdown', (e) => {
+        isDraggingSingleHandJoy = true;
+        singleHandJoyWell.setPointerCapture(e.pointerId);
+        handleSingleHandJoyMove(e.clientX);
+    });
+    singleHandJoyWell.addEventListener('pointermove', (e) => {
+        if (isDraggingSingleHandJoy) {
+            handleSingleHandJoyMove(e.clientX);
+        }
+    });
+    singleHandJoyWell.addEventListener('pointerup', (e) => {
+        isDraggingSingleHandJoy = false;
+        singleHandJoyWell.releasePointerCapture(e.pointerId);
+    });
+    singleHandJoyWell.addEventListener('pointercancel', () => {
+        isDraggingSingleHandJoy = false;
+    });
+}
+
+if (singleHandTriggerWell) {
+    singleHandTriggerWell.addEventListener('pointerdown', (e) => {
+        isDraggingSingleHandTrigger = true;
+        singleHandTriggerWell.setPointerCapture(e.pointerId);
+        handleSingleHandTriggerMove(e.clientY);
+    });
+    singleHandTriggerWell.addEventListener('pointermove', (e) => {
+        if (isDraggingSingleHandTrigger) {
+            handleSingleHandTriggerMove(e.clientY);
+        }
+    });
+    singleHandTriggerWell.addEventListener('pointerup', (e) => {
+        isDraggingSingleHandTrigger = false;
+        singleHandTriggerWell.releasePointerCapture(e.pointerId);
+    });
+    singleHandTriggerWell.addEventListener('pointercancel', () => {
+        isDraggingSingleHandTrigger = false;
+    });
+}
+
+const dpadButtons = [
+    { el: dpadUp, x: 0.0, y: 1.0 },
+    { el: dpadDown, x: 0.0, y: -1.0 },
+    { el: dpadLeft, x: -1.0, y: 0.0 },
+    { el: dpadRight, x: 1.0, y: 0.0 }
+];
+
+dpadButtons.forEach(btn => {
+    if (btn.el) {
+        btn.el.addEventListener('pointerdown', (e) => {
+            btn.el.setPointerCapture(e.pointerId);
+            keyboardTargetLeft.x = btn.x;
+            keyboardTargetLeft.y = btn.y;
+            btn.el.classList.add('active');
+        });
+        btn.el.addEventListener('pointerup', (e) => {
+            btn.el.releasePointerCapture(e.pointerId);
+            keyboardTargetLeft.x = 0.0;
+            keyboardTargetLeft.y = 0.0;
+            btn.el.classList.remove('active');
+        });
+        btn.el.addEventListener('pointercancel', () => {
+            keyboardTargetLeft.x = 0.0;
+            keyboardTargetLeft.y = 0.0;
+            btn.el.classList.remove('active');
+        });
+    }
+});
+
 // Keyboard Mapping
 window.addEventListener('keydown', (e) => {
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyS', 'KeyA', 'KeyD'].includes(e.code)) {
@@ -811,7 +956,8 @@ window.addEventListener('keyup', (e) => {
 });
 
 function updateKeyboardTargets() {
-    const is4ch = selectChannelMode && selectChannelMode.value === '4';
+    const val = selectChannelMode ? selectChannelMode.value : '2';
+    const is4ch = (val === '4' || val === '4_single');
 
     if (is4ch) {
         // --- 4-Channel Mode ---
@@ -857,18 +1003,24 @@ function updateKeyboardTargets() {
 
 // Spring Joystick Centering (WASD Return or mouse release return)
 function animateJoystick(dt) {
-    if (isDraggingJoystick) return;
-
-    // Slew joystickVal towards keyboardTarget
     const speed = 12.0; // Slew speed factor
-    joystickVal.x += (keyboardTarget.x - joystickVal.x) * speed * dt;
-    joystickVal.y += (keyboardTarget.y - joystickVal.y) * speed * dt;
 
-    // Clamp small numbers to zero
-    if (Math.abs(joystickVal.x) < 0.005 && keyboardTarget.x === 0) joystickVal.x = 0;
-    if (Math.abs(joystickVal.y) < 0.005 && keyboardTarget.y === 0) joystickVal.y = 0;
+    if (!isDraggingJoystick && !isDraggingSingleHandJoy) {
+        joystickVal.x += (keyboardTarget.x - joystickVal.x) * speed * dt;
+        if (Math.abs(joystickVal.x) < 0.005 && keyboardTarget.x === 0) joystickVal.x = 0;
+    }
+
+    if (!isDraggingJoystick && !isDraggingSingleHandTrigger) {
+        joystickVal.y += (keyboardTarget.y - joystickVal.y) * speed * dt;
+        if (Math.abs(joystickVal.y) < 0.005 && keyboardTarget.y === 0) joystickVal.y = 0;
+    }
 
     updateVisualJoystick(joystickVal.x, joystickVal.y);
+
+    if (selectChannelMode && selectChannelMode.value === '4_single') {
+        updateVisualSingleHandJoy(joystickVal.x);
+        updateVisualSingleHandTrigger(joystickVal.y);
+    }
 }
 
 // Spring Joystick Centering for Left Stick
@@ -885,6 +1037,10 @@ function animateJoystickLeft(dt) {
     if (Math.abs(joystickValLeft.y) < 0.005 && keyboardTargetLeft.y === 0) joystickValLeft.y = 0;
 
     updateVisualJoystickLeft(joystickValLeft.x, joystickValLeft.y);
+
+    if (selectChannelMode && selectChannelMode.value === '4_single') {
+        updateVisualSingleHandDpad(joystickValLeft.x, joystickValLeft.y);
+    }
 }
 
 // Particle System emitter

@@ -121,6 +121,7 @@
                         <select id="selectChannelMode" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 8px 12px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 12px; font-weight: 500; outline: none; cursor: pointer; width: 100%;">
                             <option value="2">2-Channel (Single Stick)</option>
                             <option value="4">4-Channel (Dual Stick)</option>
+                            <option value="4_single">4-Channel (Single Hand)</option>
                         </select>
                     </div>
 
@@ -400,6 +401,38 @@
                             <div class="gimbal-well" id="gimbalWell">
                                 <div class="gimbal-crosshair"></div>
                                 <div class="gimbal-stick" id="gimbalStick"></div>
+                            </div>
+                        </div>
+                        <!-- Single Hand Controls (hidden by default) -->
+                        <div class="single-hand-container" id="singleHandContainer" style="display: none; align-items: center; justify-content: center; gap: 20px; width: 100%;">
+                            <!-- 1. Trigger (Throttle) -->
+                            <div class="single-hand-trigger-container" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <span style="font-size: 8px; font-family: var(--font-mono); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Trigger (Throttle)</span>
+                                <div class="trigger-well" id="singleHandTriggerWell">
+                                    <div class="trigger-track">
+                                        <div class="trigger-bar-fill" id="singleHandTriggerFill"></div>
+                                    </div>
+                                    <div class="trigger-handle" id="singleHandTrigger"></div>
+                                </div>
+                            </div>
+                            <!-- 2. Horizontal Steering Joystick -->
+                            <div class="single-hand-joy-container" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <span style="font-size: 8px; font-family: var(--font-mono); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Steer (Left/Right)</span>
+                                <div class="gimbal-well horizontal-track" id="singleHandJoyWell" style="width: 90px; height: 40px; border-radius: 20px; overflow: hidden; background: #090c15; border: 4px solid #2d3654; position: relative;">
+                                    <div class="gimbal-crosshair"></div>
+                                    <div class="gimbal-stick" id="singleHandJoyStick" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></div>
+                                </div>
+                            </div>
+                            <!-- 3. D-Pad (Sway & Spin) -->
+                            <div class="single-hand-dpad-container" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+                                <span style="font-size: 8px; font-family: var(--font-mono); color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Aux D-Pad</span>
+                                <div class="dpad-cross" id="singleHandDpad">
+                                    <button class="dpad-btn up" id="dpadUp" title="Aux Spin Up/Forward">&utri;</button>
+                                    <button class="dpad-btn left" id="dpadLeft" title="Aux Sway Left">&ltri;</button>
+                                    <div class="dpad-center"></div>
+                                    <button class="dpad-btn right" id="dpadRight" title="Aux Sway Right">&rtri;</button>
+                                    <button class="dpad-btn down" id="dpadDown" title="Aux Spin Down/Reverse">&dtri;</button>
+                                </div>
                             </div>
                         </div>
                     </div>

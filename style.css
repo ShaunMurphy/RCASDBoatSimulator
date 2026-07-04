@@ -1599,3 +1599,153 @@ body.light-theme .target-card-row input[type="range"]::-webkit-slider-thumb {
     min-width: 0 !important; /* allow shrinking inside grid */
     padding: 6px 8px !important;
 }
+
+/* Single Hand Controller styling */
+.single-hand-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+}
+
+.trigger-well {
+    width: 32px;
+    height: 105px;
+    background: #090c15;
+    border: 4px solid #2d3654;
+    border-radius: 8px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.8), 0 1px 1px rgba(255,255,255,0.05);
+    cursor: ns-resize;
+}
+
+.trigger-track {
+    position: absolute;
+    top: 5px;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    background: #1c2237;
+    border-radius: 3px;
+}
+
+.trigger-bar-fill {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 50%; /* Default neutral center */
+    background: linear-gradient(to top, rgba(10, 132, 255, 0.5), rgba(0, 221, 255, 0.8));
+    border-radius: 3px;
+    box-shadow: 0 0 8px rgba(0, 221, 255, 0.6);
+}
+
+.trigger-handle {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px;
+    height: 14px;
+    background: linear-gradient(180deg, #3a4b7c 0%, #1e2540 100%);
+    border: 2px solid #5267a5;
+    border-radius: 3px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+    pointer-events: none; /* Let the parent well handle clicks/drags */
+}
+
+/* D-Pad cross */
+.dpad-cross {
+    position: relative;
+    width: 105px;
+    height: 105px;
+    background: #090c15;
+    border: 4px solid #2d3654;
+    border-radius: 50%;
+    box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.8), 0 1px 1px rgba(255,255,255,0.05);
+    display: grid;
+    grid-template-areas:
+        ". up ."
+        "left center right"
+        ". down .";
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    overflow: hidden;
+}
+
+.dpad-btn {
+    border: none;
+    background: transparent;
+    padding: 0;
+    outline: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 900;
+    transition: all 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+}
+
+.dpad-btn.up { grid-area: up; border-bottom: 1px solid rgba(74, 87, 125, 0.15); }
+.dpad-btn.left { grid-area: left; border-right: 1px solid rgba(74, 87, 125, 0.15); }
+.dpad-btn.right { grid-area: right; border-left: 1px solid rgba(74, 87, 125, 0.15); }
+.dpad-btn.down { grid-area: down; border-top: 1px solid rgba(74, 87, 125, 0.15); }
+
+.dpad-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.dpad-btn.active {
+    background: rgba(0, 221, 255, 0.2) !important;
+    color: #00ddff !important;
+    text-shadow: 0 0 8px rgba(0, 221, 255, 0.8);
+}
+
+.dpad-center {
+    grid-area: center;
+    width: 20px;
+    height: 20px;
+    place-self: center;
+    background: #1c2237;
+    border-radius: 50%;
+    border: 2.5px solid #2d3654;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    z-index: 2;
+}
+
+/* Light Theme overrides */
+body.light-theme .trigger-well,
+body.light-theme .dpad-cross {
+    background: #e5e5ea;
+    border-color: #acacb1;
+    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.15), 0 1px 0 rgba(255,255,255,0.8);
+}
+
+body.light-theme .trigger-track {
+    background: #d1d1d6;
+}
+
+body.light-theme .trigger-handle {
+    background: linear-gradient(180deg, #ffffff 0%, #e5e5ea 100%);
+    border-color: #acacb1;
+}
+
+body.light-theme .dpad-btn {
+    color: #48484a;
+}
+
+body.light-theme .dpad-btn.active {
+    background: rgba(0, 113, 227, 0.15) !important;
+    color: #0071e3 !important;
+    text-shadow: 0 0 4px rgba(0, 113, 227, 0.4);
+}
+
+body.light-theme .dpad-center {
+    background: #f2f2f7;
+    border-color: #acacb1;
+}
