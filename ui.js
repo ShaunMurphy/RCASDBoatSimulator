@@ -1839,7 +1839,7 @@ function updateDiagnosticsDisplay() {
 // Code panel text rendering with syntax highlighting based on active platform and mixing mode
 function renderArduinoCode() {
     const isESP32 = selectPlatform.value === 'esp32';
-    const is4ch = selectChannelMode.value === '4';
+    const is4ch = selectChannelMode.value === '4' || selectChannelMode.value === '4_single';
     const auxMode = selectAuxMode.value;
     
     let modeName = 'ASD Vectored (Vectored + Diff)';
@@ -2143,7 +2143,7 @@ ${loopCode}
         // ESP32 code using non-blocking interrupts and ESP32Servo library
         code = `
 <span class="code-comment">// ASD Thruster Mixing System for ESP32 (WROOM-32)</span>
-<span class="code-comment">// Converts 2 RC channels (Steering, Throttle) to 2 Azimuth Pods</span>
+<span class="code-comment">// Converts ${is4ch ? '4' : '2'} RC channels to 2 Azimuth Pods</span>
 <span class="code-comment">// Uses high-precision hardware interrupts for non-blocking RC pulse reading</span>
 <span class="code-comment">// Selected Mode: ${modeName}</span>
 
@@ -2152,8 +2152,7 @@ ${loopCode}
 <span class="code-comment">// Pin Assignments (ESP32 GPIOs)</span>
 <span class="code-type">const int</span> CH1_STEER_PIN = <span class="code-number">12</span>; <span class="code-comment">// Steering input pin</span>
 <span class="code-type">const int</span> CH2_THROT_PIN = <span class="code-number">13</span>; <span class="code-comment">// Throttle input pin</span>
-
-<span class="code-type">const int</span> SERVO_L_PIN = <span class="code-number">25</span>;
+${is4ch ? '<span class="code-type">const int</span> CH3_SWAY_PIN = <span class="code-number">32</span>;  <span class="code-comment">// Sway input pin</span>\n<span class="code-type">const int</span> CH4_SPIN_PIN = <span class="code-number">33</span>;  <span class="code-comment">// Spin input pin</span>\n' : ''}<span class="code-type">const int</span> SERVO_L_PIN = <span class="code-number">25</span>;
 <span class="code-type">const int</span> SERVO_R_PIN = <span class="code-number">26</span>;
 <span class="code-type">const int</span> ESC_L_PIN = <span class="code-number">14</span>;
 <span class="code-type">const int</span> ESC_R_PIN = <span class="code-number">27</span>;
@@ -2171,6 +2170,7 @@ Servo servoR;
 <span class="code-type">volatile unsigned long</span> ch2_start = <span class="code-number">0</span>;
 <span class="code-type">volatile int</span> rxSteer = <span class="code-number">1500</span>;
 <span class="code-type">volatile int</span> rxThrot = <span class="code-number">1500</span>;
+${is4ch ? '<span class="code-type">volatile unsigned long</span> ch3_start = <span class="code-number">0</span>;\n<span class="code-type">volatile unsigned long</span> ch4_start = <span class="code-number">0</span>;\n<span class="code-type">volatile int</span> rxSway = <span class="code-number">1500</span>;\n<span class="code-type">volatile int</span> rxSpin = <span class="code-number">1500</span>;\n' : ''}
 
 <span class="code-type">void</span> IRAM_ATTR <span class="code-function">ch1_isr</span>() {
   <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH1_STEER_PIN) == HIGH) {
@@ -2191,6 +2191,27 @@ Servo servoR;
     }
   }
 }
+${is4ch ? `
+<span class="code-type">void</span> IRAM_ATTR <span class="code-function">ch3_isr</span>() {
+  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH3_SWAY_PIN) == HIGH) {
+    ch3_start = <span class="code-function">micros</span>();
+  } <span class="code-keyword">else</span> {
+    <span class="code-keyword">if</span> (ch3_start &gt; <span class="code-number">0</span>) {
+      rxSway = <span class="code-function">micros</span>() - ch3_start;
+    }
+  }
+}
+
+<span class="code-type">void</span> IRAM_ATTR <span class="code-function">ch4_isr</span>() {
+  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH4_SPIN_PIN) == HIGH) {
+    ch4_start = <span class="code-function">micros</span>();
+  } <span class="code-keyword">else</span> {
+    <span class="code-keyword">if</span> (ch4_start &gt; <span class="code-number">0</span>) {
+      rxSpin = <span class="code-function">micros</span>() - ch4_start;
+    }
+  }
+}
+` : ''}
 
 <span class="code-comment">// Physical states</span>
 <span class="code-type">float</span> curAngleL = <span class="code-number">0.0</span>;
@@ -2216,7 +2237,12 @@ Servo servoR;
   <span class="code-function">pinMode</span>(CH2_THROT_PIN, INPUT_PULLUP);
   <span class="code-function">attachInterrupt</span>(CH1_STEER_PIN, ch1_isr, CHANGE);
   <span class="code-function">attachInterrupt</span>(CH2_THROT_PIN, ch2_isr, CHANGE);
-  
+  ${is4ch ? `
+  <span class="code-function">pinMode</span>(CH3_SWAY_PIN, INPUT_PULLUP);
+  <span class="code-function">pinMode</span>(CH4_SPIN_PIN, INPUT_PULLUP);
+  <span class="code-function">attachInterrupt</span>(CH3_SWAY_PIN, ch3_isr, CHANGE);
+  <span class="code-function">attachInterrupt</span>(CH4_SPIN_PIN, ch4_isr, CHANGE);
+  ` : ''}
   lastTime = <span class="code-function">micros</span>();
 }
 
@@ -2229,22 +2255,24 @@ Servo servoR;
   <span class="code-keyword">noInterrupts</span>();
   <span class="code-type">int</span> steerPWM = rxSteer;
   <span class="code-type">int</span> throtPWM = rxThrot;
+  ${is4ch ? '<span class="code-type">int</span> swayPWM = rxSway;\n  <span class="code-type">int</span> spinPWM = rxSpin;' : ''}
   <span class="code-keyword">interrupts</span>();
 
   <span class="code-comment">// 1. Normalize Inputs to [-1.0, 1.0]</span>
   <span class="code-type">float</span> x = (steerPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;
   <span class="code-type">float</span> y = (throtPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;
-  
+  ${is4ch ? '<span class="code-type">float</span> x_aux = (swayPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;\n  <span class="code-type">float</span> y_aux = (spinPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;\n' : ''}
   <span class="code-keyword">if</span> (${checkInvertSteer.checked}) {
     x = -x;
   }
   
   x = <span class="code-function">constrain</span>(x, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);
   y = <span class="code-function">constrain</span>(y, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);
-
-  <span class="code-comment">// Deadzone filter</span>
+  ${is4ch ? 'x_aux = <span class="code-function">constrain</span>(x_aux, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);\n  y_aux = <span class="code-function">constrain</span>(y_aux, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);\n' : ''}
+  // Deadzone filter
   <span class="code-keyword">if</span> (<span class="code-function">abs</span>(x) &lt; <span class="code-number">0.02</span>) x = <span class="code-number">0.0</span>;
   <span class="code-keyword">if</span> (<span class="code-function">abs</span>(y) &lt; <span class="code-number">0.02</span>) y = <span class="code-number">0.0</span>;
+  ${is4ch ? '<span class="code-keyword">if</span> (<span class="code-function">abs</span>(x_aux) &lt; <span class="code-number">0.02</span>) x_aux = <span class="code-number">0.0</span>;\n  <span class="code-keyword">if</span> (<span class="code-function">abs</span>(y_aux) &lt; <span class="code-number">0.02</span>) y_aux = <span class="code-number">0.0</span>;\n' : ''}
 
 ${loopCode}
 
@@ -2282,7 +2310,7 @@ function drawWiringDiagram() {
     if (!panelWiring || panelWiring.style.display === 'none') return;
     
     const isESP32 = selectPlatform.value === 'esp32';
-    const is4ch = selectChannelMode.value === '4';
+    const is4ch = selectChannelMode.value === '4' || selectChannelMode.value === '4_single';
     
     // Update platform text labels
     wiringPlatformLabel.innerText = isESP32 ? 'ESP32 DEVKIT' : 'ARDUINO UNO';
