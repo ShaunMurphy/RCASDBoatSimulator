@@ -2150,8 +2150,8 @@ ${loopCode}
 #include &lt;ESP32Servo.h&gt;
 
 <span class="code-comment">// Pin Assignments (ESP32 GPIOs)</span>
-<span class="code-type">const int</span> CH1_STEER_PIN = <span class="code-number">16</span>; <span class="code-comment">// Steering input pin</span>
-<span class="code-type">const int</span> CH2_THROT_PIN = <span class="code-number">17</span>; <span class="code-comment">// Throttle input pin</span>
+<span class="code-type">const int</span> CH1_STEER_PIN = <span class="code-number">23</span>; <span class="code-comment">// Steering input pin</span>
+<span class="code-type">const int</span> CH2_THROT_PIN = <span class="code-number">22</span>; <span class="code-comment">// Throttle input pin</span>
 ${is4ch ? '<span class="code-type">const int</span> CH3_SWAY_PIN = <span class="code-number">32</span>;  <span class="code-comment">// Sway input pin</span>\n<span class="code-type">const int</span> CH4_SPIN_PIN = <span class="code-number">33</span>;  <span class="code-comment">// Spin input pin</span>\n' : ''}<span class="code-type">const int</span> SERVO_L_PIN = <span class="code-number">25</span>;
 <span class="code-type">const int</span> SERVO_R_PIN = <span class="code-number">26</span>;
 <span class="code-type">const int</span> ESC_L_PIN = <span class="code-number">14</span>;
@@ -2316,8 +2316,8 @@ function drawWiringDiagram() {
     wiringPlatformLabel.innerText = isESP32 ? 'ESP32 DEVKIT' : 'ARDUINO UNO';
     wiringMcuTitle.innerText = isESP32 ? 'ESP32 (WROOM-32)' : 'Arduino Uno';
     
-    labelMcuIn1.innerText = isESP32 ? 'GPIO16 (CH1)' : 'D2 (CH1)';
-    labelMcuIn2.innerText = isESP32 ? 'GPIO17 (CH2)' : 'D3 (CH2)';
+    labelMcuIn1.innerText = isESP32 ? 'GPIO23 (CH1)' : 'D2 (CH1)';
+    labelMcuIn2.innerText = isESP32 ? 'GPIO22 (CH2)' : 'D3 (CH2)';
     labelMcuIn3.innerText = isESP32 ? 'GPIO32 (CH3)' : 'D4 (CH3)';
     labelMcuIn4.innerText = isESP32 ? 'GPIO33 (CH4)' : 'D7 (CH4)';
     
