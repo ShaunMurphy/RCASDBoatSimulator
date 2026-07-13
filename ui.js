@@ -160,17 +160,13 @@ const selectPlatform = document.getElementById('selectPlatform');
 const codeText = document.getElementById('codeText');
 const btnCopyCode = document.getElementById('btnCopyCode');
 
-// Wiring diagram specific components
-const wiringPlatformLabel = document.getElementById('wiringPlatformLabel');
-const wiringMcuTitle = document.getElementById('wiringMcuTitle');
-const labelMcuIn1 = document.getElementById('labelMcuIn1');
-const labelMcuIn2 = document.getElementById('labelMcuIn2');
-const labelMcuIn3 = document.getElementById('labelMcuIn3');
-const labelMcuIn4 = document.getElementById('labelMcuIn4');
-const labelMcuOut1 = document.getElementById('labelMcuOut1');
-const labelMcuOut2 = document.getElementById('labelMcuOut2');
-const labelMcuOut3 = document.getElementById('labelMcuOut3');
-const labelMcuOut4 = document.getElementById('labelMcuOut4');
+// Live I/O board monitor components
+const vbBoard = document.getElementById('vbBoard');
+const vbScope = document.getElementById('vbScope');
+const vbPlatformBadge = document.getElementById('vbPlatformBadge');
+const vbScopeAxis = document.getElementById('vbScopeAxis');
+const vbLogicLow = document.getElementById('vbLogicLow');
+const vbLogicHigh = document.getElementById('vbLogicHigh');
 
 // Custom Mixing Mode Editor Elements
 const btnNewAlgo = document.getElementById('btnNewAlgo');
@@ -609,7 +605,7 @@ function setTabActive(tabName) {
         renderArduinoCode();
     }
     if (tabName === 'wiring') {
-        drawWiringDiagram();
+        updateBoardMonitor();
     }
 }
 
@@ -1176,7 +1172,7 @@ function loop(timeNow) {
 
     // 8. Update Panels
     updateDiagnosticsDisplay();
-    drawWiringDiagram();
+    updateBoardMonitor();
 
     requestAnimationFrame(loop);
 }
@@ -2445,103 +2441,252 @@ ${loopCode}
     codeText.innerHTML = code;
 }
 
-function drawWiringDiagram() {
+// ---------- Live I/O Board Monitor ----------
+// A virtual ESP32 / Arduino board that mirrors the exact pins the generated
+// firmware drives. It updates every frame from the same mixing outputs that
+// move the simulated boat, so the pin states, PWM pulse widths and the scope
+// react live as the transmitter sticks move.
+
+let vbSignature = '';  // "platform|channels" — rebuild the DOM only when this changes
+let vbPins = [];       // active pin descriptors with cached DOM references
+
+function vbClamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
+
+function buildBoardPins(isESP32, is4ch) {
+    // Colours mirror the simulator / channel palette.
+    const inputs = [
+        { key: 'ch1', gpio: isESP32 ? 'GPIO23' : 'D2', name: 'CH1 · Steer',    color: '#30d158', kind: 'in' },
+        { key: 'ch2', gpio: isESP32 ? 'GPIO22' : 'D3', name: 'CH2 · Throttle', color: '#0a84ff', kind: 'in' },
+    ];
+    if (is4ch) {
+        inputs.push({ key: 'ch3', gpio: isESP32 ? 'GPIO32' : 'D4', name: 'CH3 · Sway', color: '#ff9f0a', kind: 'in' });
+        inputs.push({ key: 'ch4', gpio: isESP32 ? 'GPIO33' : 'D7', name: 'CH4 · Spin', color: '#bf5af2', kind: 'in' });
+    }
+    const outputs = [
+        { key: 'servoL', gpio: isESP32 ? 'GPIO25' : 'D9',  name: 'Servo L · Port', color: '#ff453a', kind: 'servo' },
+        { key: 'servoR', gpio: isESP32 ? 'GPIO26' : 'D10', name: 'Servo R · Stbd', color: '#ff9f0a', kind: 'servo' },
+        { key: 'escL',   gpio: isESP32 ? 'GPIO14' : 'D5',  name: 'ESC L · Port',   color: '#30d158', kind: 'esc' },
+        { key: 'escR',   gpio: isESP32 ? 'GPIO27' : 'D6',  name: 'ESC R · Stbd',   color: '#0a84ff', kind: 'esc' },
+    ];
+
+    vbBoard.innerHTML = '';
+    vbPins = [];
+
+    const makeCol = (title) => {
+        const col = document.createElement('div');
+        col.className = 'vb-col';
+        const t = document.createElement('div');
+        t.className = 'vb-col-title';
+        t.textContent = title;
+        col.appendChild(t);
+        return col;
+    };
+
+    const makePin = (desc, bipolar) => {
+        const pin = document.createElement('div');
+        pin.className = 'vb-pin';
+
+        const top = document.createElement('div');
+        top.className = 'vb-pin-top';
+        const led = document.createElement('span');
+        led.className = 'vb-led';
+        const gpio = document.createElement('span');
+        gpio.className = 'vb-gpio';
+        gpio.textContent = desc.gpio;
+        const name = document.createElement('span');
+        name.className = 'vb-name';
+        name.textContent = desc.name;
+        top.appendChild(led); top.appendChild(gpio); top.appendChild(name);
+
+        const barBg = document.createElement('div');
+        barBg.className = 'vb-bar-bg';
+        const barFill = document.createElement('div');
+        barFill.className = 'vb-bar-fill';
+        barFill.style.background = desc.color;
+        barBg.appendChild(barFill);
+        if (bipolar) {
+            const mid = document.createElement('div');
+            mid.className = 'vb-bar-mid';
+            barBg.appendChild(mid);
+        }
+
+        const ro = document.createElement('div');
+        ro.className = 'vb-readout';
+        const us = document.createElement('span');
+        us.className = 'vb-us';
+        const sub = document.createElement('span');
+        sub.className = 'vb-sub';
+        ro.appendChild(us); ro.appendChild(sub);
+
+        pin.appendChild(top); pin.appendChild(barBg); pin.appendChild(ro);
+        vbPins.push({ ...desc, bipolar, el: { pin, led, barFill, us, sub } });
+        return pin;
+    };
+
+    const chip = document.createElement('div');
+    chip.className = 'vb-chip';
+    chip.innerHTML =
+        `<div class="vb-chip-name">${isESP32 ? 'ESP32<br>WROOM-32' : 'ATmega328P<br>UNO'}</div>` +
+        `<div class="vb-chip-sub">${isESP32 ? '240 MHz' : '16 MHz'}</div>` +
+        `<div class="vb-chip-dots">${'<span></span>'.repeat(16)}</div>`;
+
+    const inCol = makeCol('Inputs · RC Rx');
+    inputs.forEach(d => inCol.appendChild(makePin(d, true)));
+    const outCol = makeCol('Outputs · Actuators');
+    outputs.forEach(d => outCol.appendChild(makePin(d, d.kind === 'servo')));
+
+    vbBoard.appendChild(inCol);
+    vbBoard.appendChild(chip);
+    vbBoard.appendChild(outCol);
+}
+
+function updateBoardMonitor() {
     if (!panelWiring || panelWiring.style.display === 'none') return;
-    
+    if (!vbBoard) return;
+
     const isESP32 = selectPlatform.value === 'esp32';
     const is4ch = selectChannelMode.value === '4' || selectChannelMode.value === '4_single';
-    
-    // Update platform text labels
-    wiringPlatformLabel.innerText = isESP32 ? 'ESP32 DEVKIT' : 'ARDUINO UNO';
-    wiringMcuTitle.innerText = isESP32 ? 'ESP32 (WROOM-32)' : 'Arduino Uno';
-    
-    labelMcuIn1.innerText = isESP32 ? 'GPIO23 (CH1)' : 'D2 (CH1)';
-    labelMcuIn2.innerText = isESP32 ? 'GPIO22 (CH2)' : 'D3 (CH2)';
-    labelMcuIn3.innerText = isESP32 ? 'GPIO32 (CH3)' : 'D4 (CH3)';
-    labelMcuIn4.innerText = isESP32 ? 'GPIO33 (CH4)' : 'D7 (CH4)';
-    
-    labelMcuOut1.innerText = isESP32 ? 'GPIO25 (ServoL)' : 'D9 (ServoL)';
-    labelMcuOut2.innerText = isESP32 ? 'GPIO26 (ServoR)' : 'D10 (ServoR)';
-    labelMcuOut3.innerText = isESP32 ? 'GPIO14 (ESCL)' : 'D5 (ESCL)';
-    labelMcuOut4.innerText = isESP32 ? 'GPIO27 (ESCR)' : 'D6 (ESCR)';
-    
-    // Show/hide CH3/CH4 pins
-    document.getElementById('pinRxCh3').style.display = is4ch ? 'flex' : 'none';
-    document.getElementById('pinRxCh4').style.display = is4ch ? 'flex' : 'none';
-    document.getElementById('pinMcuIn3').style.display = is4ch ? 'flex' : 'none';
-    document.getElementById('pinMcuIn4').style.display = is4ch ? 'flex' : 'none';
-    
-    // Redraw SVG path lines
-    const svg = document.getElementById('wiringSVG');
-    svg.innerHTML = ''; // Clear existing paths
-    
-    const svgRect = svg.getBoundingClientRect();
-    if (svgRect.width === 0 || svgRect.height === 0) return; // parent panel not yet laid out
-    
-    function drawWire(dotStartId, dotEndId, color, valPercent = 0.0) {
-        const dotStart = document.getElementById(dotStartId);
-        const dotEnd = document.getElementById(dotEndId);
-        if (!dotStart || !dotEnd) return;
-        
-        const rStart = dotStart.getBoundingClientRect();
-        const rEnd = dotEnd.getBoundingClientRect();
-        
-        // Coordinates relative to SVG
-        const x1 = rStart.left + rStart.width / 2.0 - svgRect.left;
-        const y1 = rStart.top + rStart.height / 2.0 - svgRect.top;
-        const x2 = rEnd.left + rEnd.width / 2.0 - svgRect.left;
-        const y2 = rEnd.top + rEnd.height / 2.0 - svgRect.top;
-        
-        // Compute control points for a beautiful horizontal S-curve
-        const dx = Math.abs(x2 - x1);
-        const dy = Math.abs(y2 - y1);
-        const cx1 = x1 + dx * 0.4 * (x2 > x1 ? 1 : -1);
-        const cy1 = y1 + dy * 0.05 * (y2 > y1 ? 1 : -1);
-        const cx2 = x2 - dx * 0.4 * (x2 > x1 ? 1 : -1);
-        const cy2 = y2 - dy * 0.05 * (y2 > y1 ? 1 : -1);
-        
-        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        path.setAttribute('d', `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`);
-        path.setAttribute('fill', 'none');
-        path.setAttribute('stroke', color);
-        path.setAttribute('stroke-width', (2.0 + Math.abs(valPercent) * 2.0).toFixed(1));
-        path.setAttribute('stroke-linecap', 'round');
-        
-        // If signal is active, add a neon glow filter or pulse
-        if (Math.abs(valPercent) > 0.05) {
-            path.setAttribute('filter', 'drop-shadow(0px 0px 3px ' + color + ')');
-            path.setAttribute('stroke-width', (3.0 + Math.abs(valPercent) * 2.5).toFixed(1));
+    const vLogic = isESP32 ? '3.3 V' : '5 V';
+
+    const sig = `${isESP32 ? 'esp' : 'avr'}|${is4ch ? '4' : '2'}`;
+    if (sig !== vbSignature) {
+        buildBoardPins(isESP32, is4ch);
+        vbSignature = sig;
+        if (vbPlatformBadge) vbPlatformBadge.innerHTML = `${isESP32 ? 'ESP32' : 'Arduino Uno'} &middot; ${isESP32 ? '3.3V' : '5V'} logic`;
+        if (vbLogicHigh) vbLogicHigh.textContent = vLogic;
+    }
+
+    const mo = controller.microOut;
+    const rc = controller.rcIn;
+    const usFor = (key) => ({
+        ch1: rc.ch1, ch2: rc.ch2, ch3: rc.ch3, ch4: rc.ch4,
+        servoL: mo.pwmServoLeft, servoR: mo.pwmServoRight,
+        escL: mo.pwmEscLeft, escR: mo.pwmEscRight,
+    })[key];
+
+    const scopeCh = [];
+    for (const p of vbPins) {
+        const us = Math.round(usFor(p.key));
+        let activity, subText, fillLeft, fillW;
+
+        if (p.kind === 'esc') {
+            const duty = vbClamp01((us - 1000) / 1000);
+            activity = duty;
+            subText = `${Math.round(duty * 100)}%`;
+            fillLeft = 0; fillW = duty * 100;
         } else {
-            path.setAttribute('opacity', '0.6');
+            const v = Math.max(-1, Math.min(1, (us - 1500) / 500));
+            activity = Math.abs(v);
+            if (p.kind === 'servo') {
+                const deg = (p.key === 'servoL' ? mo.servoLeftAngle : mo.servoRightAngle) * 180 / Math.PI;
+                subText = `${deg >= 0 ? '+' : ''}${deg.toFixed(0)}°`;
+            } else {
+                subText = `${v >= 0 ? '+' : ''}${Math.round(v * 100)}%`;
+            }
+            if (v >= 0) { fillLeft = 50; fillW = v * 50; }
+            else { fillLeft = 50 + v * 50; fillW = -v * 50; }
         }
-        
-        svg.appendChild(path);
+
+        const e = p.el;
+        e.us.textContent = `${us} µs`;
+        e.sub.textContent = subText;
+        e.barFill.style.left = `${fillLeft}%`;
+        e.barFill.style.width = `${fillW}%`;
+
+        const on = activity > 0.02;
+        e.led.style.background = on ? p.color : '';
+        e.led.style.boxShadow = on ? `0 0 ${3 + activity * 6}px ${p.color}` : '';
+        e.pin.style.borderColor = on ? p.color : '';
+
+        scopeCh.push({ name: p.gpio, us, color: p.color });
     }
-    
-    // Calculate active signal values for glow scaling
-    const normX = (controller.rcIn.ch1 - 1500) / 500.0;
-    const normY = (controller.rcIn.ch2 - 1500) / 500.0;
-    const normXAux = is4ch ? (controller.rcIn.ch3 - 1500) / 500.0 : 0.0;
-    const normYAux = is4ch ? (controller.rcIn.ch4 - 1500) / 500.0 : 0.0;
-    
-    // 1. Draw Input Wires (Rx -> MCU)
-    drawWire('dotRxCh1', 'dotMcuIn1', '#30d158', normX); // Green for Steering (Yaw)
-    drawWire('dotRxCh2', 'dotMcuIn2', '#0a84ff', normY); // Blue for Throttle (Speed)
-    if (is4ch) {
-        drawWire('dotRxCh3', 'dotMcuIn3', '#ff9f0a', normXAux); // Orange for Sway
-        drawWire('dotRxCh4', 'dotMcuIn4', '#bf5af2', normYAux); // Purple for Spin
+
+    drawBoardScope(scopeCh, vLogic);
+}
+
+function drawBoardScope(channels, vLogic) {
+    if (!vbScope || channels.length === 0) return;
+
+    const light = document.body.classList.contains('light-theme');
+    const ink = light ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.5)';
+    const grid = light ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.07)';
+    const base = light ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.10)';
+
+    const cssW = vbScope.clientWidth || 300;
+    const laneH = 24;
+    const padTop = 6, padBottom = 4;
+    const cssH = padTop + padBottom + channels.length * laneH;
+    const dpr = window.devicePixelRatio || 1;
+
+    if (vbScope.width !== Math.round(cssW * dpr) || vbScope.height !== Math.round(cssH * dpr)) {
+        vbScope.width = Math.round(cssW * dpr);
+        vbScope.height = Math.round(cssH * dpr);
+        vbScope.style.height = cssH + 'px';
     }
-    
-    // 2. Draw Output Wires (MCU -> Pods)
-    const actServoL = controller.microOut.servoLeftAngle / (controller.config.maxToeIn || 1.0);
-    const actServoR = controller.microOut.servoRightAngle / (controller.config.maxToeIn || 1.0);
-    const actEscL = controller.microOut.escLeftSpeed;
-    const actEscR = controller.microOut.escRightSpeed;
-    
-    drawWire('dotMcuOut1', 'dotServoL', '#ff3547', actServoL); // Red (Servo L)
-    drawWire('dotMcuOut2', 'dotServoR', '#ff9f0a', actServoR); // Orange (Servo R)
-    drawWire('dotMcuOut3', 'dotEscL', '#30d158', actEscL);     // Green (ESC L)
-    drawWire('dotMcuOut4', 'dotEscR', '#0a84ff', actEscR);     // Blue (ESC R)
+
+    const ctx = vbScope.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const gutter = 54;
+    const plotX = gutter;
+    const plotW = Math.max(40, cssW - gutter - 6);
+    const windowMs = 40;   // two 50 Hz frames
+    const periodMs = 20;
+    const xOf = (ms) => plotX + (ms / windowMs) * plotW;
+
+    // Frame gridlines at 0 / 20 / 40 ms
+    ctx.strokeStyle = grid;
+    ctx.lineWidth = 1;
+    for (let ms = 0; ms <= windowMs; ms += periodMs) {
+        const x = Math.round(xOf(ms)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(x, padTop); ctx.lineTo(x, cssH - padBottom); ctx.stroke();
+    }
+
+    channels.forEach((ch, i) => {
+        const top = padTop + i * laneH;
+        const hi = top + 4;
+        const lo = top + laneH - 8;
+
+        ctx.textBaseline = 'alphabetic';
+        ctx.textAlign = 'left';
+        ctx.fillStyle = ch.color;
+        ctx.font = '8px monospace';
+        ctx.fillText(ch.name, 2, top + laneH / 2 - 1);
+        ctx.fillStyle = ink;
+        ctx.font = '7px monospace';
+        ctx.fillText(ch.us + 'µs', 2, top + laneH / 2 + 9);
+
+        ctx.strokeStyle = base;
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(plotX, lo + 0.5); ctx.lineTo(plotX + plotW, lo + 0.5); ctx.stroke();
+
+        // Idealised PWM pulse train (pulse width = current µs)
+        const highMs = ch.us / 1000;
+        ctx.strokeStyle = ch.color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(plotX, lo);
+        let t = 0;
+        while (t < windowMs) {
+            const riseX = xOf(t);
+            const fallX = xOf(Math.min(t + highMs, windowMs));
+            ctx.lineTo(riseX, lo);
+            ctx.lineTo(riseX, hi);
+            ctx.lineTo(fallX, hi);
+            ctx.lineTo(fallX, lo);
+            t += periodMs;
+        }
+        ctx.lineTo(plotX + plotW, lo);
+        ctx.stroke();
+    });
+
+    ctx.fillStyle = ink;
+    ctx.font = '7px monospace';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'right';
+    ctx.fillText(vLogic + ' hi / 0 V lo', cssW - 4, 1);
+    ctx.textAlign = 'left';
 }
 
 // --- Custom Mixing Mode Editor System ---
