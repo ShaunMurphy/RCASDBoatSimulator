@@ -1861,6 +1861,20 @@ function renderArduinoCode() {
     const is4ch = selectChannelMode.value === '4' || selectChannelMode.value === '4_single';
     const auxMode = selectAuxMode.value;
     
+    const transWeightVal = parseFloat(slideTransWeight.value);
+    const transWeightStr = transWeightVal === 1.0 ? '' : ` * ${slideTransWeight.value}`;
+    const rotWeightVal = parseFloat(slideRotWeight.value);
+    const rotWeightStr = rotWeightVal === 1.0 ? '' : ` * ${slideRotWeight.value}`;
+    const latWeightVal = parseFloat(slideLatWeight.value);
+    const latWeightStr = latWeightVal === 1.0 ? '' : ` * ${slideLatWeight.value}`;
+
+    // Custom algorithms reference W_TRANS/W_ROT/W_LAT symbolically, so declare them
+    // (built-in algorithms inline the numeric weights above instead).
+    const isCustomAlgo = selectAlgorithm.value.startsWith('custom_');
+    const weightDecls = isCustomAlgo
+        ? `\n<span class="code-type">const float</span> W_TRANS = <span class="code-number">${slideTransWeight.value}</span>;\n<span class="code-type">const float</span> W_ROT = <span class="code-number">${slideRotWeight.value}</span>;\n<span class="code-type">const float</span> W_LAT = <span class="code-number">${slideLatWeight.value}</span>;`
+        : '';
+
     let modeName = 'ASD Vectored (Vectored + Diff)';
     if (selectAlgorithm.value === 'differential') {
         modeName = 'ASD Differential (Longitudinal Only)';
@@ -1880,8 +1894,6 @@ function renderArduinoCode() {
     let swaySpinCode = '';
     if (is4ch) {
         swaySpinCode = `  // 2. Compute Auxiliary Sway and Spin Components
-  float sway = 0.0;
-  float spin = 0.0;
   if (${isESP32 ? 'SWAY_ENABLED' : (auxMode === 'sway_spin' || auxMode === 'sway')}) {
     sway = x_aux;
   }
@@ -1906,7 +1918,7 @@ function renderArduinoCode() {
         }
     } else if (selectAlgorithm.value === 'vectored') {
         loopCode = `  ${is4ch ? swaySpinCode + '\n\n' : ''}// 3. Compute Translation Force Components
-  float s_trans = abs(y) * ${slideTransWeight.value};
+  float s_trans = abs(y)${transWeightStr};
   float alpha = 0.0;
   if (y >= 0) {
     alpha = MAX_TOE_IN * (1.0 - abs(y));
@@ -1922,10 +1934,10 @@ function renderArduinoCode() {
   float fR_trans_y = s_trans * cos(thetaR_trans);
 
   // 4. Compute Rotation Force Components (Primary Steering + Aux Spin)
-  float fL_rot_y = ${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
-  float fR_rot_y = -${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
-  float fL_rot_x = -${is4ch ? '(x + spin)' : 'x'} * ${slideLatWeight.value};
-  float fR_rot_x = -${is4ch ? '(x + spin)' : 'x'} * ${slideLatWeight.value};
+  float fL_rot_y = ${is4ch ? '(x + spin)' : 'x'}${rotWeightStr};
+  float fR_rot_y = -${is4ch ? '(x + spin)' : 'x'}${rotWeightStr};
+  float fL_rot_x = -${is4ch ? '(x + spin)' : 'x'}${latWeightStr};
+  float fR_rot_x = -${is4ch ? '(x + spin)' : 'x'}${latWeightStr};
 
   // 5. Compute Sway Force Components (Pure Lateral Slide)
   float fL_sway_x = 0.0;
@@ -1934,10 +1946,10 @@ function renderArduinoCode() {
   float fR_sway_y = 0.0;
   if (${isESP32 ? 'SWAY_ENABLED' : is4ch}) {
     float k = 4.2667;
-    fL_sway_x = (sway * ${slideLatWeight.value}) / 2.0;
-    fL_sway_y = (k * sway * ${slideLatWeight.value}) / 2.0;
-    fR_sway_x = (sway * ${slideLatWeight.value}) / 2.0;
-    fR_sway_y = (-k * sway * ${slideLatWeight.value}) / 2.0;
+    fL_sway_x = (sway${latWeightStr}) / 2.0;
+    fL_sway_y = (k * sway${latWeightStr}) / 2.0;
+    fR_sway_x = (sway${latWeightStr}) / 2.0;
+    fR_sway_y = (-k * sway${latWeightStr}) / 2.0;
   }
 
   // 6. Vector Superposition
@@ -1963,19 +1975,17 @@ function renderArduinoCode() {
   float targetAngleR = (targetSpeedR > 0.005) ? atan2(fR_x, fR_y) : thetaR_trans;`;
     } else if (selectAlgorithm.value === 'crabwalk') {
         loopCode = `  ${is4ch ? swaySpinCode + '\n\n' : ''}// 3. Compute Translation Components (Crabwalk Mode)
-  float wTrans = ${slideTransWeight.value};
-  float wLat = ${slideLatWeight.value};
   float k = 4.2667; // Lever arm ratio -thrusterDistY / thrusterDistX
 
   float totalSway = ${is4ch ? 'x + sway' : 'x'};
   float totalSpin = ${is4ch ? 'spin' : '0.0'};
 
-  float Ax = (totalSway * wLat) / 2.0;
-  float AyL = (y * wTrans + k * totalSway * wLat) / 2.0;
-  float AyR = (y * wTrans - k * totalSway * wLat) / 2.0;
+  float Ax = (totalSway${latWeightStr}) / 2.0;
+  float AyL = (y${transWeightStr} + k * totalSway${latWeightStr}) / 2.0;
+  float AyR = (y${transWeightStr} - k * totalSway${latWeightStr}) / 2.0;
 
-  float fL_rot_y = ${is4ch ? `totalSpin * ${slideRotWeight.value}` : '0.0'};
-  float fR_rot_y = ${is4ch ? `-totalSpin * ${slideRotWeight.value}` : '0.0'};
+  float fL_rot_y = ${is4ch ? `totalSpin${rotWeightStr}` : '0.0'};
+  float fR_rot_y = ${is4ch ? `-totalSpin${rotWeightStr}` : '0.0'};
 
   float fL_x = Ax;
   float fL_y = AyL + fL_rot_y;
@@ -2000,7 +2010,7 @@ function renderArduinoCode() {
   float targetAngleR = (targetSpeedR > 0.005) ? atan2(fR_x, fR_y) : 0.0;`;
     } else {
         loopCode = `  ${is4ch ? swaySpinCode + '\n\n' : ''}// 3. Compute Translation Force Components
-  float s_trans = abs(y) * ${slideTransWeight.value};
+  float s_trans = abs(y)${transWeightStr};
   float alpha = 0.0;
   if (y >= 0) {
     alpha = MAX_TOE_IN * (1.0 - abs(y));
@@ -2016,8 +2026,8 @@ function renderArduinoCode() {
   float fR_trans_y = s_trans * cos(thetaR_trans);
 
   // 4. Compute Rotation Force Components (Longitudinal differential + Aux Spin)
-  float fL_rot_y = ${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
-  float fR_rot_y = -${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
+  float fL_rot_y = ${is4ch ? '(x + spin)' : 'x'}${rotWeightStr};
+  float fR_rot_y = -${is4ch ? '(x + spin)' : 'x'}${rotWeightStr};
 
   // 5. Vector Addition / Superposition
   float fL_x = fL_trans_x;
@@ -2037,22 +2047,20 @@ function renderArduinoCode() {
 
     if (!isESP32) {
         // Arduino code definitions
-        let pinDecls = `const int CH1_STEER_PIN = 2;
-const int CH2_THROT_PIN = 3;`;
         let readCode = `  long ch1 = pulseIn(CH1_STEER_PIN, HIGH, 25000);
   long ch2 = pulseIn(CH2_THROT_PIN, HIGH, 25000);`;
         let fallbackCode = `  if (ch1 == 0) ch1 = 1500;
   if (ch2 == 0) ch2 = 1500;`;
         let normCode = `  float x = (ch1 - 1500) / 500.0;
-  float y = (ch2 - 1500) / 500.0;`;
+  float y = (ch2 - 1500) / 500.0;
+  float sway = 0.0;
+  float spin = 0.0;`;
         let constrainCode = `  x = constrain(x, -1.0, 1.0);
   y = constrain(y, -1.0, 1.0);`;
         let deadzoneCode = `  if (abs(x) < 0.02) x = 0.0;
   if (abs(y) < 0.02) y = 0.0;`;
 
         if (is4ch) {
-            pinDecls += `\nconst int CH3_SWAY_PIN = 4;
-const int CH4_SPIN_PIN = 7;`;
             readCode += `\n  long ch3 = pulseIn(CH3_SWAY_PIN, HIGH, 25000);
   long ch4 = pulseIn(CH4_SPIN_PIN, HIGH, 25000);`;
             fallbackCode += `\n  if (ch3 == 0) ch3 = 1500;
@@ -2072,8 +2080,9 @@ const int CH4_SPIN_PIN = 7;`;
 
 #include &lt;Servo.h&gt;
 
+<span class="code-type">const int</span> CH1_STEER_PIN = <span class="code-number">2</span>;
 <span class="code-type">const int</span> CH2_THROT_PIN = <span class="code-number">3</span>;
-
+${is4ch ? '<span class="code-type">const int</span> CH3_SWAY_PIN = <span class="code-number">4</span>;\n<span class="code-type">const int</span> CH4_SPIN_PIN = <span class="code-number">7</span>;\n' : ''}
 <span class="code-type">const int</span> SERVO_L_PIN = <span class="code-number">9</span>;
 <span class="code-type">const int</span> SERVO_R_PIN = <span class="code-number">10</span>;
 <span class="code-type">const int</span> ESC_L_PIN = <span class="code-number">5</span>;
@@ -2081,7 +2090,7 @@ const int CH4_SPIN_PIN = 7;`;
 
 <span class="code-comment">// Config parameters</span>
 <span class="code-type">const float</span> MAX_TOE_IN = <span class="code-number">${slideToeIn.value}</span> * PI / <span class="code-number">180.0</span>;
-<span class="code-type">const float</span> SERVO_SPEED = <span class="code-number">${slideServoSpeed.value}</span> * PI / <span class="code-number">180.0</span>; <span class="code-comment">// rad/s</span>
+<span class="code-type">const float</span> SERVO_SPEED = <span class="code-number">${slideServoSpeed.value}</span> * PI / <span class="code-number">180.0</span>; <span class="code-comment">// rad/s</span>${weightDecls}
 
 <span class="code-comment">// Servo and ESC controllers</span>
 Servo servoL;
@@ -2108,27 +2117,22 @@ Servo servoR;
   lastTime = now;
 
   <span class="code-comment">// Read input RC PWM pulse durations (1000 - 2000 us, blocking)</span>
-  <span class="code-type">long</span> ch1 = <span class="code-function">pulseIn</span>(CH1_STEER_PIN, HIGH, <span class="code-number">25000</span>);
-  <span class="code-type">long</span> ch2 = <span class="code-function">pulseIn</span>(CH2_THROT_PIN, HIGH, <span class="code-number">25000</span>);
+${readCode}
 
   <span class="code-comment">// Handle missing signal (default to neutral)</span>
-  <span class="code-keyword">if</span> (ch1 == <span class="code-number">0</span>) ch1 = <span class="code-number">1500</span>;
-  <span class="code-keyword">if</span> (ch2 == <span class="code-number">0</span>) ch2 = <span class="code-number">1500</span>;
+${fallbackCode}
 
   <span class="code-comment">// 1. Normalize Inputs to [-1.0, 1.0]</span>
-  <span class="code-type">float</span> x = (ch1 - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;
-  <span class="code-type">float</span> y = (ch2 - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;
-  
+${normCode}
+
   <span class="code-keyword">if</span> (${checkInvertSteer.checked}) {
     x = -x;
   }
-  
-  x = <span class="code-function">constrain</span>(x, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);
-  y = <span class="code-function">constrain</span>(y, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);
+
+${constrainCode}
 
   <span class="code-comment">// Deadzone filter</span>
-  <span class="code-keyword">if</span> (<span class="code-function">abs</span>(x) &lt; <span class="code-number">0.02</span>) x = <span class="code-number">0.0</span>;
-  <span class="code-keyword">if</span> (<span class="code-function">abs</span>(y) &lt; <span class="code-number">0.02</span>) y = <span class="code-number">0.0</span>;
+${deadzoneCode}
 
 ${loopCode}
 
@@ -2178,13 +2182,14 @@ ${is4ch ? '<span class="code-type">const int</span> CH3_SWAY_PIN = <span class="
 
 <span class="code-comment">// Config parameters</span>
 <span class="code-type">const bool</span> REVERSE_STEER = ${checkInvertSteer.checked ? 'true' : 'false'};
-<span class="code-type">const bool</span> SWAY_ENABLED  = ${is4ch && (auxMode === 'sway_spin' || auxMode === 'sway') ? 'true' : 'false'};
-<span class="code-type">const bool</span> SPIN_ENABLED  = ${is4ch && (auxMode === 'sway_spin' || auxMode === 'spin') ? 'true' : 'false'};
+<span class="code-type">const bool</span> SWAY_ENABLED [[maybe_unused]] = ${is4ch && (auxMode === 'sway_spin' || auxMode === 'sway') ? 'true' : 'false'};
+<span class="code-type">const bool</span> SPIN_ENABLED [[maybe_unused]] = ${is4ch && (auxMode === 'sway_spin' || auxMode === 'spin') ? 'true' : 'false'};
 
 <span class="code-type">const float</span> MAX_TOE_IN = ${slideToeIn.value} * PI / 180.0f;
-<span class="code-type">const float</span> SERVO_SPEED = ${slideServoSpeed.value} * PI / 180.0f; <span class="code-comment">// rad/s</span>
+<span class="code-type">const float</span> SERVO_SPEED = ${slideServoSpeed.value} * PI / 180.0f; <span class="code-comment">// rad/s</span>${weightDecls}
 
-<span class="code-comment">// Mechanical pod limits</span>
+<span class="code-comment">// Mechanical pod limits. PI represents full 360-degree rotation (rotate ±180°).</span>
+<span class="code-comment">// For standard 180-degree servos (rotate ±90°), set this to PI / 2.0f.</span>
 <span class="code-type">const float</span> POD_MAX_ANGLE = PI; // rad
 <span class="code-type">const int</span> SERVO_US_MIN = 500;
 <span class="code-type">const int</span> SERVO_US_MID = 1500;
@@ -2348,6 +2353,8 @@ ${is4ch ? `
   <span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(x) &lt; <span class="code-number">0.02f</span>) x = <span class="code-number">0.0f</span>;
   <span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(y) &lt; <span class="code-number">0.02f</span>) y = <span class="code-number">0.0f</span>;
   ${is4ch ? '<span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(x_aux) &lt; <span class="code-number">0.02f</span>) x_aux = <span class="code-number">0.0f</span>;\n  <span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(y_aux) &lt; <span class="code-number">0.02f</span>) y_aux = <span class="code-number">0.0f</span>;\n' : ''}
+  <span class="code-type">float</span> sway = 0.0f;
+  <span class="code-type">float</span> spin = 0.0f;
 
 ${loopCode}
 
@@ -2384,6 +2391,15 @@ ${loopCode}
   <span class="code-keyword">return</span> <span class="code-function">atan2f</span>(<span class="code-function">sinf</span>(next), <span class="code-function">cosf</span>(next));
 }
         `;
+    }
+    if (isESP32) {
+        code = code
+            .replace(/([^a-zA-Z_])abs(<\/span>)?\(/g, '$1fabsf$2(')
+            .replace(/([^a-zA-Z_])sin(<\/span>)?\(/g, '$1sinf$2(')
+            .replace(/([^a-zA-Z_])cos(<\/span>)?\(/g, '$1cosf$2(')
+            .replace(/([^a-zA-Z_])sqrt(<\/span>)?\(/g, '$1sqrtf$2(')
+            .replace(/([^a-zA-Z_])atan2(<\/span>)?\(/g, '$1atan2f$2(')
+            .replace(/([0-9]+\.[0-9]+)([^f0-9])/g, '$1f$2');
     }
     codeText.innerHTML = code;
 }
