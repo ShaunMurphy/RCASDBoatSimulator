@@ -1882,10 +1882,10 @@ function renderArduinoCode() {
         swaySpinCode = `  // 2. Compute Auxiliary Sway and Spin Components
   float sway = 0.0;
   float spin = 0.0;
-  if (${auxMode === 'sway_spin' || auxMode === 'sway'}) {
+  if (${isESP32 ? 'SWAY_ENABLED' : (auxMode === 'sway_spin' || auxMode === 'sway')}) {
     sway = x_aux;
   }
-  if (${auxMode === 'sway_spin' || auxMode === 'spin'}) {
+  if (${isESP32 ? 'SPIN_ENABLED' : (auxMode === 'sway_spin' || auxMode === 'spin')}) {
     spin = y_aux;
   }`;
     }
@@ -1909,9 +1909,9 @@ function renderArduinoCode() {
   float s_trans = abs(y) * ${slideTransWeight.value};
   float alpha = 0.0;
   if (y >= 0) {
-    alpha = MAX_TOE_IN * (1.0 - constrain(abs(y), 0.0, 1.0));
+    alpha = MAX_TOE_IN * (1.0 - abs(y));
   } else {
-    alpha = MAX_TOE_IN + (PI - MAX_TOE_IN) * constrain(abs(y), 0.0, 1.0);
+    alpha = MAX_TOE_IN + (PI - MAX_TOE_IN) * abs(y);
   }
   float thetaL_trans = -alpha;
   float thetaR_trans = alpha;
@@ -1922,17 +1922,17 @@ function renderArduinoCode() {
   float fR_trans_y = s_trans * cos(thetaR_trans);
 
   // 4. Compute Rotation Force Components (Primary Steering + Aux Spin)
-  float fL_rot_y = (x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
-  float fR_rot_y = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
-  float fL_rot_x = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideLatWeight.value};
-  float fR_rot_x = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideLatWeight.value};
+  float fL_rot_y = ${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
+  float fR_rot_y = -${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
+  float fL_rot_x = -${is4ch ? '(x + spin)' : 'x'} * ${slideLatWeight.value};
+  float fR_rot_x = -${is4ch ? '(x + spin)' : 'x'} * ${slideLatWeight.value};
 
   // 5. Compute Sway Force Components (Pure Lateral Slide)
   float fL_sway_x = 0.0;
   float fL_sway_y = 0.0;
   float fR_sway_x = 0.0;
   float fR_sway_y = 0.0;
-  if (${is4ch}) {
+  if (${isESP32 ? 'SWAY_ENABLED' : is4ch}) {
     float k = 4.2667;
     fL_sway_x = (sway * ${slideLatWeight.value}) / 2.0;
     fL_sway_y = (k * sway * ${slideLatWeight.value}) / 2.0;
@@ -1967,15 +1967,15 @@ function renderArduinoCode() {
   float wLat = ${slideLatWeight.value};
   float k = 4.2667; // Lever arm ratio -thrusterDistY / thrusterDistX
 
-  float totalSway = x + ${is4ch ? 'sway' : '0.0'};
+  float totalSway = ${is4ch ? 'x + sway' : 'x'};
   float totalSpin = ${is4ch ? 'spin' : '0.0'};
 
   float Ax = (totalSway * wLat) / 2.0;
   float AyL = (y * wTrans + k * totalSway * wLat) / 2.0;
   float AyR = (y * wTrans - k * totalSway * wLat) / 2.0;
 
-  float fL_rot_y = totalSpin * ${slideRotWeight.value};
-  float fR_rot_y = -totalSpin * ${slideRotWeight.value};
+  float fL_rot_y = ${is4ch ? `totalSpin * ${slideRotWeight.value}` : '0.0'};
+  float fR_rot_y = ${is4ch ? `-totalSpin * ${slideRotWeight.value}` : '0.0'};
 
   float fL_x = Ax;
   float fL_y = AyL + fL_rot_y;
@@ -2003,9 +2003,9 @@ function renderArduinoCode() {
   float s_trans = abs(y) * ${slideTransWeight.value};
   float alpha = 0.0;
   if (y >= 0) {
-    alpha = MAX_TOE_IN * (1.0 - constrain(abs(y), 0.0, 1.0));
+    alpha = MAX_TOE_IN * (1.0 - abs(y));
   } else {
-    alpha = MAX_TOE_IN + (PI - MAX_TOE_IN) * constrain(abs(y), 0.0, 1.0);
+    alpha = MAX_TOE_IN + (PI - MAX_TOE_IN) * abs(y);
   }
   float thetaL_trans = -alpha;
   float thetaR_trans = alpha;
@@ -2016,8 +2016,8 @@ function renderArduinoCode() {
   float fR_trans_y = s_trans * cos(thetaR_trans);
 
   // 4. Compute Rotation Force Components (Longitudinal differential + Aux Spin)
-  float fL_rot_y = (x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
-  float fR_rot_y = -(x + ${is4ch ? 'spin' : '0.0'}) * ${slideRotWeight.value};
+  float fL_rot_y = ${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
+  float fR_rot_y = -${is4ch ? '(x + spin)' : 'x'} * ${slideRotWeight.value};
 
   // 5. Vector Addition / Superposition
   float fL_x = fL_trans_x;
@@ -2177,148 +2177,211 @@ ${is4ch ? '<span class="code-type">const int</span> CH3_SWAY_PIN = <span class="
 <span class="code-type">const int</span> ESC_R_PIN = <span class="code-number">27</span>;
 
 <span class="code-comment">// Config parameters</span>
-<span class="code-type">const float</span> MAX_TOE_IN = <span class="code-number">${slideToeIn.value}</span> * PI / <span class="code-number">180.0</span>;
-<span class="code-type">const float</span> SERVO_SPEED = <span class="code-number">${slideServoSpeed.value}</span> * PI / <span class="code-number">180.0</span>; <span class="code-comment">// rad/s</span>
+<span class="code-type">const bool</span> REVERSE_STEER = ${checkInvertSteer.checked ? 'true' : 'false'};
+<span class="code-type">const bool</span> SWAY_ENABLED  = ${is4ch && (auxMode === 'sway_spin' || auxMode === 'sway') ? 'true' : 'false'};
+<span class="code-type">const bool</span> SPIN_ENABLED  = ${is4ch && (auxMode === 'sway_spin' || auxMode === 'spin') ? 'true' : 'false'};
 
-<span class="code-comment">// Servo structures</span>
-Servo servoL;
-Servo servoR;
+<span class="code-type">const float</span> MAX_TOE_IN = ${slideToeIn.value} * PI / 180.0f;
+<span class="code-type">const float</span> SERVO_SPEED = ${slideServoSpeed.value} * PI / 180.0f; <span class="code-comment">// rad/s</span>
+
+<span class="code-comment">// Mechanical pod limits</span>
+<span class="code-type">const float</span> POD_MAX_ANGLE = PI; // rad
+<span class="code-type">const int</span> SERVO_US_MIN = 500;
+<span class="code-type">const int</span> SERVO_US_MID = 1500;
+<span class="code-type">const int</span> SERVO_US_MAX = 2500;
+
+<span class="code-comment">// RC pulse validation / failsafe</span>
+<span class="code-type">const int</span> PULSE_MIN_US = 800;
+<span class="code-type">const int</span> PULSE_MAX_US = 2200;
+<span class="code-type">const unsigned long</span> RC_TIMEOUT_US = 100000; // 100 ms
+
+<span class="code-comment">// Servo and ESC controllers</span>
+Servo servoL, servoR, escL, escR;
 
 <span class="code-comment">// Volatile interrupt states for non-blocking PWM reading</span>
-<span class="code-type">volatile unsigned long</span> ch1_start = <span class="code-number">0</span>;
-<span class="code-type">volatile unsigned long</span> ch2_start = <span class="code-number">0</span>;
-<span class="code-type">volatile int</span> rxSteer = <span class="code-number">1500</span>;
-<span class="code-type">volatile int</span> rxThrot = <span class="code-number">1500</span>;
-${is4ch ? '<span class="code-type">volatile unsigned long</span> ch3_start = <span class="code-number">0</span>;\n<span class="code-type">volatile unsigned long</span> ch4_start = <span class="code-number">0</span>;\n<span class="code-type">volatile int</span> rxSway = <span class="code-number">1500</span>;\n<span class="code-type">volatile int</span> rxSpin = <span class="code-number">1500</span>;\n' : ''}
+portMUX_TYPE rcMux = portMUX_INITIALIZER_UNLOCKED;
 
+<span class="code-type">volatile unsigned long</span> ch1_rise = 0, ch2_rise = 0;
+<span class="code-type">volatile int</span> rxSteer = SERVO_US_MID, rxThrot = SERVO_US_MID;
+<span class="code-type">volatile unsigned long</span> ch1_last = 0, ch2_last = 0;
+${is4ch ? '<span class="code-type">volatile unsigned long</span> ch3_rise = 0, ch4_rise = 0;\n<span class="code-type">volatile int</span> rxSway = SERVO_US_MID, rxSpin = SERVO_US_MID;\n<span class="code-type">volatile unsigned long</span> ch3_last = 0, ch4_last = 0;\n' : ''}
 <span class="code-type">void</span> IRAM_ATTR <span class="code-function">ch1_isr</span>() {
-  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH1_STEER_PIN) == HIGH) {
-    ch1_start = <span class="code-function">micros</span>();
-  } <span class="code-keyword">else</span> {
-    <span class="code-keyword">if</span> (ch1_start &gt; <span class="code-number">0</span>) {
-      rxSteer = <span class="code-function">micros</span>() - ch1_start;
+  <span class="code-type">unsigned long</span> now = <span class="code-function">micros</span>();
+  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH1_STEER_PIN)) {
+    ch1_rise = now;
+  } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (ch1_rise) {
+    <span class="code-type">unsigned long</span> w = now - ch1_rise;
+    <span class="code-keyword">if</span> (w >= PULSE_MIN_US && w <= PULSE_MAX_US) {
+      rxSteer = (int)w;
+      ch1_last = now;
     }
   }
 }
 
 <span class="code-type">void</span> IRAM_ATTR <span class="code-function">ch2_isr</span>() {
-  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH2_THROT_PIN) == HIGH) {
-    ch2_start = <span class="code-function">micros</span>();
-  } <span class="code-keyword">else</span> {
-    <span class="code-keyword">if</span> (ch2_start &gt; <span class="code-number">0</span>) {
-      rxThrot = <span class="code-function">micros</span>() - ch2_start;
+  <span class="code-type">unsigned long</span> now = <span class="code-function">micros</span>();
+  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH2_THROT_PIN)) {
+    ch2_rise = now;
+  } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (ch2_rise) {
+    <span class="code-type">unsigned long</span> w = now - ch2_rise;
+    <span class="code-keyword">if</span> (w >= PULSE_MIN_US && w <= PULSE_MAX_US) {
+      rxThrot = (int)w;
+      ch2_last = now;
     }
   }
 }
 ${is4ch ? `
 <span class="code-type">void</span> IRAM_ATTR <span class="code-function">ch3_isr</span>() {
-  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH3_SWAY_PIN) == HIGH) {
-    ch3_start = <span class="code-function">micros</span>();
-  } <span class="code-keyword">else</span> {
-    <span class="code-keyword">if</span> (ch3_start &gt; <span class="code-number">0</span>) {
-      rxSway = <span class="code-function">micros</span>() - ch3_start;
+  <span class="code-type">unsigned long</span> now = <span class="code-function">micros</span>();
+  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH3_SWAY_PIN)) {
+    ch3_rise = now;
+  } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (ch3_rise) {
+    <span class="code-type">unsigned long</span> w = now - ch3_rise;
+    <span class="code-keyword">if</span> (w >= PULSE_MIN_US && w <= PULSE_MAX_US) {
+      rxSway = (int)w;
+      ch3_last = now;
     }
   }
 }
 
 <span class="code-type">void</span> IRAM_ATTR <span class="code-function">ch4_isr</span>() {
-  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH4_SPIN_PIN) == HIGH) {
-    ch4_start = <span class="code-function">micros</span>();
-  } <span class="code-keyword">else</span> {
-    <span class="code-keyword">if</span> (ch4_start &gt; <span class="code-number">0</span>) {
-      rxSpin = <span class="code-function">micros</span>() - ch4_start;
+  <span class="code-type">unsigned long</span> now = <span class="code-function">micros</span>();
+  <span class="code-keyword">if</span> (<span class="code-function">digitalRead</span>(CH4_SPIN_PIN)) {
+    ch4_rise = now;
+  } <span class="code-keyword">else</span> <span class="code-keyword">if</span> (ch4_rise) {
+    <span class="code-type">unsigned long</span> w = now - ch4_rise;
+    <span class="code-keyword">if</span> (w >= PULSE_MIN_US && w <= PULSE_MAX_US) {
+      rxSpin = (int)w;
+      ch4_last = now;
     }
   }
 }
 ` : ''}
+<span class="code-comment">// ---------- Forward declarations ----------</span>
+<span class="code-type">float</span> <span class="code-function">slewAngle</span>(<span class="code-type">float</span> cur, <span class="code-type">float</span> target, <span class="code-type">float</span> limit, <span class="code-type">float</span> dt);
+<span class="code-type">int</span> <span class="code-function">angleToUs</span>(<span class="code-type">float</span> angle);
 
 <span class="code-comment">// Physical states</span>
-<span class="code-type">float</span> curAngleL = <span class="code-number">0.0</span>;
-<span class="code-type">float</span> curAngleR = <span class="code-number">0.0</span>;
-<span class="code-type">unsigned long</span> lastTime = <span class="code-number">0</span>;
+<span class="code-type">float</span> curAngleL = 0.0f;
+<span class="code-type">float</span> curAngleR = 0.0f;
+<span class="code-type">unsigned long</span> lastTime = 0;
 
 <span class="code-type">void</span> <span class="code-function">setup</span>() {
-  <span class="code-comment">// ESP32 requires timers allocation</span>
-  ESP32PWM::allocateTimer(<span class="code-number">0</span>);
-  ESP32PWM::allocateTimer(<span class="code-number">1</span>);
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
   
-  servoL.setPeriodHertz(<span class="code-number">50</span>);
-  servoR.setPeriodHertz(<span class="code-number">50</span>);
+  servoL.setPeriodHertz(50);
+  servoR.setPeriodHertz(50);
+  escL.setPeriodHertz(50);
+  escR.setPeriodHertz(50);
 
-  servoL.<span class="code-function">attach</span>(SERVO_L_PIN, <span class="code-number">500</span>, <span class="code-number">2500</span>);
-  servoR.<span class="code-function">attach</span>(SERVO_R_PIN, <span class="code-number">500</span>, <span class="code-number">2500</span>);
+  servoL.<span class="code-function">attach</span>(SERVO_L_PIN, SERVO_US_MIN, SERVO_US_MAX);
+  servoR.<span class="code-function">attach</span>(SERVO_R_PIN, SERVO_US_MIN, SERVO_US_MAX);
+  escL.<span class="code-function">attach</span>(ESC_L_PIN, 1000, 2000);
+  escR.<span class="code-function">attach</span>(ESC_R_PIN, 1000, 2000);
+
+  // Arming sequence hold
+  escL.<span class="code-function">writeMicroseconds</span>(1000);
+  escR.<span class="code-function">writeMicroseconds</span>(1000);
+  servoL.<span class="code-function">writeMicroseconds</span>(SERVO_US_MID);
+  servoR.<span class="code-function">writeMicroseconds</span>(SERVO_US_MID);
+  <span class="code-function">delay</span>(3000);
   
-  <span class="code-function">pinMode</span>(ESC_L_PIN, OUTPUT);
-  <span class="code-function">pinMode</span>(ESC_R_PIN, OUTPUT);
-
-  <span class="code-comment">// Attach ISR interrupts for RC inputs</span>
-  <span class="code-function">pinMode</span>(CH1_STEER_PIN, INPUT_PULLUP);
-  <span class="code-function">pinMode</span>(CH2_THROT_PIN, INPUT_PULLUP);
-  <span class="code-function">attachInterrupt</span>(CH1_STEER_PIN, ch1_isr, CHANGE);
-  <span class="code-function">attachInterrupt</span>(CH2_THROT_PIN, ch2_isr, CHANGE);
+  <span class="code-function">pinMode</span>(CH1_STEER_PIN, INPUT);
+  <span class="code-function">pinMode</span>(CH2_THROT_PIN, INPUT);
+  <span class="code-function">attachInterrupt</span>(<span class="code-function">digitalPinToInterrupt</span>(CH1_STEER_PIN), ch1_isr, CHANGE);
+  <span class="code-function">attachInterrupt</span>(<span class="code-function">digitalPinToInterrupt</span>(CH2_THROT_PIN), ch2_isr, CHANGE);
   ${is4ch ? `
-  <span class="code-function">pinMode</span>(CH3_SWAY_PIN, INPUT_PULLUP);
-  <span class="code-function">pinMode</span>(CH4_SPIN_PIN, INPUT_PULLUP);
-  <span class="code-function">attachInterrupt</span>(CH3_SWAY_PIN, ch3_isr, CHANGE);
-  <span class="code-function">attachInterrupt</span>(CH4_SPIN_PIN, ch4_isr, CHANGE);
+  <span class="code-function">pinMode</span>(CH3_SWAY_PIN, INPUT);
+  <span class="code-function">pinMode</span>(CH4_SPIN_PIN, INPUT);
+  <span class="code-function">attachInterrupt</span>(<span class="code-function">digitalPinToInterrupt</span>(CH3_SWAY_PIN), ch3_isr, CHANGE);
+  <span class="code-function">attachInterrupt</span>(<span class="code-function">digitalPinToInterrupt</span>(CH4_SPIN_PIN), ch4_isr, CHANGE);
   ` : ''}
   lastTime = <span class="code-function">micros</span>();
 }
 
 <span class="code-type">void</span> <span class="code-function">loop</span>() {
   <span class="code-type">unsigned long</span> now = <span class="code-function">micros</span>();
-  <span class="code-type">float</span> dt = (now - lastTime) / <span class="code-number">1000000.0</span>;
+  <span class="code-type">float</span> dt = (now - lastTime) / <span class="code-number">1000000.0f</span>;
   lastTime = now;
+  <span class="code-keyword">if</span> (dt &lt;= <span class="code-number">0.0f</span> || dt &gt; <span class="code-number">0.5f</span>) dt = <span class="code-number">0.02f</span>;
 
-  <span class="code-comment">// Safely copy volatile pulse readings (atomic read on ESP32)</span>
-  <span class="code-keyword">noInterrupts</span>();
+  // ---- Snapshot ISR state ----
+  <span class="code-function">portENTER_CRITICAL</span>(&amp;rcMux);
   <span class="code-type">int</span> steerPWM = rxSteer;
   <span class="code-type">int</span> throtPWM = rxThrot;
-  ${is4ch ? '<span class="code-type">int</span> swayPWM = rxSway;\n  <span class="code-type">int</span> spinPWM = rxSpin;' : ''}
-  <span class="code-keyword">interrupts</span>();
+  <span class="code-type">unsigned long</span> t1 = ch1_last;
+  <span class="code-type">unsigned long</span> t2 = ch2_last;
+  ${is4ch ? '<span class="code-type">int</span> swayPWM = rxSway;\n  <span class="code-type">int</span> spinPWM = rxSpin;\n  <span class="code-type">unsigned long</span> t3 = ch3_last;\n  <span class="code-type">unsigned long</span> t4 = ch4_last;' : ''}
+  <span class="code-function">portEXIT_CRITICAL</span>(&amp;rcMux);
 
-  <span class="code-comment">// 1. Normalize Inputs to [-1.0, 1.0]</span>
-  <span class="code-type">float</span> x = (steerPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;
-  <span class="code-type">float</span> y = (throtPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;
-  ${is4ch ? '<span class="code-type">float</span> x_aux = (swayPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;\n  <span class="code-type">float</span> y_aux = (spinPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0</span>;\n' : ''}
-  <span class="code-keyword">if</span> (${checkInvertSteer.checked}) {
+  // ---- Failsafe check ----
+  <span class="code-type">bool</span> rcLost = (t1 == <span class="code-number">0</span>) || (t2 == <span class="code-number">0</span>) ||
+                (now - t1 &gt; RC_TIMEOUT_US) ||
+                (now - t2 &gt; RC_TIMEOUT_US)${is4ch ? ' ||\n                (t3 == 0) || (t4 == 0) ||\n                (now - t3 > RC_TIMEOUT_US) ||\n                (now - t4 > RC_TIMEOUT_US)' : ''};
+
+  <span class="code-keyword">if</span> (rcLost) {
+    escL.<span class="code-function">writeMicroseconds</span>(<span class="code-number">1000</span>);
+    escR.<span class="code-function">writeMicroseconds</span>(<span class="code-number">1000</span>);
+    curAngleL = <span class="code-function">slewAngle</span>(curAngleL, <span class="code-number">0.0f</span>, SERVO_SPEED, dt);
+    curAngleR = <span class="code-function">slewAngle</span>(curAngleR, <span class="code-number">0.0f</span>, SERVO_SPEED, dt);
+    servoL.<span class="code-function">writeMicroseconds</span>(<span class="code-function">angleToUs</span>(curAngleL));
+    servoR.<span class="code-function">writeMicroseconds</span>(<span class="code-function">angleToUs</span>(curAngleR));
+    <span class="code-function">delay</span>(<span class="code-number">10</span>);
+    <span class="code-keyword">return</span>;
+  }
+
+  // ---- 1. Normalize Inputs to [-1.0, 1.0] ----
+  <span class="code-type">float</span> x = (steerPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0f</span>;
+  <span class="code-type">float</span> y = (throtPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0f</span>;
+  ${is4ch ? '<span class="code-type">float</span> x_aux = (swayPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0f</span>;\n  <span class="code-type">float</span> y_aux = (spinPWM - <span class="code-number">1500</span>) / <span class="code-number">500.0f</span>;\n' : ''}
+  <span class="code-keyword">if</span> (REVERSE_STEER) {
     x = -x;
   }
   
-  x = <span class="code-function">constrain</span>(x, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);
-  y = <span class="code-function">constrain</span>(y, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);
-  ${is4ch ? 'x_aux = <span class="code-function">constrain</span>(x_aux, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);\n  y_aux = <span class="code-function">constrain</span>(y_aux, -<span class="code-number">1.0</span>, <span class="code-number">1.0</span>);\n' : ''}
+  x = <span class="code-function">constrain</span>(x, -<span class="code-number">1.0f</span>, <span class="code-number">1.0f</span>);
+  y = <span class="code-function">constrain</span>(y, -<span class="code-number">1.0f</span>, <span class="code-number">1.0f</span>);
+  ${is4ch ? 'x_aux = <span class="code-function">constrain</span>(x_aux, -<span class="code-number">1.0f</span>, <span class="code-number">1.0f</span>);\n  y_aux = <span class="code-function">constrain</span>(y_aux, -<span class="code-number">1.0f</span>, <span class="code-number">1.0f</span>);\n' : ''}
   // Deadzone filter
-  <span class="code-keyword">if</span> (<span class="code-function">abs</span>(x) &lt; <span class="code-number">0.02</span>) x = <span class="code-number">0.0</span>;
-  <span class="code-keyword">if</span> (<span class="code-function">abs</span>(y) &lt; <span class="code-number">0.02</span>) y = <span class="code-number">0.0</span>;
-  ${is4ch ? '<span class="code-keyword">if</span> (<span class="code-function">abs</span>(x_aux) &lt; <span class="code-number">0.02</span>) x_aux = <span class="code-number">0.0</span>;\n  <span class="code-keyword">if</span> (<span class="code-function">abs</span>(y_aux) &lt; <span class="code-number">0.02</span>) y_aux = <span class="code-number">0.0</span>;\n' : ''}
+  <span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(x) &lt; <span class="code-number">0.02f</span>) x = <span class="code-number">0.0f</span>;
+  <span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(y) &lt; <span class="code-number">0.02f</span>) y = <span class="code-number">0.0f</span>;
+  ${is4ch ? '<span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(x_aux) &lt; <span class="code-number">0.02f</span>) x_aux = <span class="code-number">0.0f</span>;\n  <span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(y_aux) &lt; <span class="code-number">0.02f</span>) y_aux = <span class="code-number">0.0f</span>;\n' : ''}
 
 ${loopCode}
 
-  <span class="code-comment">// 6. Simulating physical servo rotation speed limit</span>
+  // Clamp target angles to mechanical pod limits
+  targetAngleL = <span class="code-function">constrain</span>(targetAngleL, -POD_MAX_ANGLE, POD_MAX_ANGLE);
+  targetAngleR = <span class="code-function">constrain</span>(targetAngleR, -POD_MAX_ANGLE, POD_MAX_ANGLE);
+
+  // ---- Slew limit ----
   curAngleL = <span class="code-function">slewAngle</span>(curAngleL, targetAngleL, SERVO_SPEED, dt);
   curAngleR = <span class="code-function">slewAngle</span>(curAngleR, targetAngleR, SERVO_SPEED, dt);
 
-  <span class="code-comment">// 7. Map variables to hardware PWM outputs</span>
-  <span class="code-type">int</span> pwmServoL = <span class="code-number">1500</span> + (curAngleL / PI) * <span class="code-number">500</span>;
-  <span class="code-type">int</span> pwmServoR = <span class="code-number">1500</span> + (curAngleR / PI) * <span class="code-number">500</span>;
-  servoL.<span class="code-function">writeMicroseconds</span>(pwmServoL);
-  servoR.<span class="code-function">writeMicroseconds</span>(pwmServoR);
+  // ---- Output ----
+  servoL.<span class="code-function">writeMicroseconds</span>(<span class="code-function">angleToUs</span>(curAngleL));
+  servoR.<span class="code-function">writeMicroseconds</span>(<span class="code-function">angleToUs</span>(curAngleR));
 
-  <span class="code-comment">// ESC write mapping (analogWrite uses LEDC hardware PWM natively on ESP32 in Arduino core)</span>
-  <span class="code-type">int</span> pwmEscL = <span class="code-number">1000</span> + targetSpeedL * <span class="code-number">1000</span>;
-  <span class="code-type">int</span> pwmEscR = <span class="code-number">1000</span> + targetSpeedR * <span class="code-number">1000</span>;
-  <span class="code-function">analogWrite</span>(ESC_L_PIN, map(pwmEscL, <span class="code-number">1000</span>, <span class="code-number">2000</span>, <span class="code-number">0</span>, <span class="code-number">255</span>));
-  <span class="code-function">analogWrite</span>(ESC_R_PIN, map(pwmEscR, <span class="code-number">1000</span>, <span class="code-number">2000</span>, <span class="code-number">0</span>, <span class="code-number">255</span>));
+  escL.<span class="code-function">writeMicroseconds</span>(<span class="code-number">1000</span> + (<span class="code-type">int</span>)(<span class="code-function">constrain</span>(targetSpeedL, <span class="code-number">0.0f</span>, <span class="code-number">1.0f</span>) * <span class="code-number">1000</span>));
+  escR.<span class="code-function">writeMicroseconds</span>(<span class="code-number">1000</span> + (<span class="code-type">int</span>)(<span class="code-function">constrain</span>(targetSpeedR, <span class="code-number">0.0f</span>, <span class="code-number">1.0f</span>) * <span class="code-number">1000</span>));
+  
+  <span class="code-function">delay</span>(<span class="code-number">10</span>); // ~100 Hz control loop
+}
+
+<span class="code-type">int</span> <span class="code-function">angleToUs</span>(<span class="code-type">float</span> angle) {
+  angle = <span class="code-function">constrain</span>(angle, -POD_MAX_ANGLE, POD_MAX_ANGLE);
+  <span class="code-type">float</span> halfSpan = (SERVO_US_MAX - SERVO_US_MIN) / <span class="code-number">2.0f</span>;
+  <span class="code-type">int</span> us = SERVO_US_MID + (<span class="code-type">int</span>)((angle / POD_MAX_ANGLE) * halfSpan);
+  <span class="code-keyword">return</span> <span class="code-function">constrain</span>(us, SERVO_US_MIN, SERVO_US_MAX);
 }
 
 <span class="code-type">float</span> <span class="code-function">slewAngle</span>(<span class="code-type">float</span> cur, <span class="code-type">float</span> target, <span class="code-type">float</span> limit, <span class="code-type">float</span> dt) {
-  <span class="code-type">float</span> diff = target - cur;
-  diff = <span class="code-function">atan2</span>(<span class="code-function">sin</span>(diff), <span class="code-function">cos</span>(diff));
+  <span class="code-type">float</span> diff = <span class="code-function">atan2f</span>(<span class="code-function">sinf</span>(target - cur), <span class="code-function">cosf</span>(target - cur));
   <span class="code-type">float</span> step = limit * dt;
-  <span class="code-keyword">if</span> (<span class="code-function">abs</span>(diff) &lt;= step) <span class="code-keyword">return</span> target;
-  <span class="code-type">float</span> stepSign = (diff &gt; <span class="code-number">0</span>) ? step : -step;
-  <span class="code-keyword">return</span> <span class="code-function">atan2</span>(<span class="code-function">sin</span>(cur + stepSign), <span class="code-function">cos</span>(cur + stepSign));
+  <span class="code-keyword">if</span> (<span class="code-function">fabsf</span>(diff) &lt;= step) <span class="code-keyword">return</span> target;
+  <span class="code-type">float</span> next = cur + ((diff &gt; <span class="code-number">0</span>) ? step : -step);
+  <span class="code-keyword">return</span> <span class="code-function">atan2f</span>(<span class="code-function">sinf</span>(next), <span class="code-function">cosf</span>(next));
 }
         `;
     }
