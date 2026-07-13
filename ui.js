@@ -1875,6 +1875,47 @@ function renderArduinoCode() {
         ? `\n<span class="code-type">const float</span> W_TRANS = <span class="code-number">${slideTransWeight.value}</span>;\n<span class="code-type">const float</span> W_ROT = <span class="code-number">${slideRotWeight.value}</span>;\n<span class="code-type">const float</span> W_LAT = <span class="code-number">${slideLatWeight.value}</span>;`
         : '';
 
+    // One-time computer setup instructions, embedded as comments so they travel with
+    // copy/paste and appear right at the top of the sketch. Written for hardware
+    // engineers who may be new to the Arduino toolchain.
+    const cmt = (t) => `<span class="code-comment">// ${t}</span>`;
+    const setupGuide = isESP32
+        ? [
+            cmt('=========================================================================='),
+            cmt(' FIRST-TIME SETUP  -  do this once on your computer (about 5 minutes)'),
+            cmt('=========================================================================='),
+            cmt(' 1. Install the Arduino IDE (version 2.x):'),
+            cmt('      https://www.arduino.cc/en/software'),
+            cmt(' 2. Add ESP32 board support:'),
+            cmt('      File -> Preferences -> "Additional Boards Manager URLs", paste:'),
+            cmt('      https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json'),
+            cmt('      Then: Tools -> Board -> Boards Manager -> search "esp32"'),
+            cmt('      (by Espressif Systems) -> Install.'),
+            cmt(' 3. Install the servo library:'),
+            cmt('      Tools -> Manage Libraries -> search "ESP32Servo"'),
+            cmt('      (by Kevin Harrington / John K. Bennett) -> Install.'),
+            cmt(' 4. Select the board:  Tools -> Board -> ESP32 Arduino -> "ESP32 Dev Module".'),
+            cmt(' 5. Plug the ESP32 into USB, then pick the port:'),
+            cmt('      Tools -> Port -> (your COM / tty port).'),
+            cmt(' 6. Press Upload (the round right-arrow button). That flashes the ESP32.'),
+            cmt('=========================================================================='),
+            ''
+        ].join('\n')
+        : [
+            cmt('=========================================================================='),
+            cmt(' FIRST-TIME SETUP  -  do this once on your computer (about 5 minutes)'),
+            cmt('=========================================================================='),
+            cmt(' 1. Install the Arduino IDE (version 2.x):'),
+            cmt('      https://www.arduino.cc/en/software'),
+            cmt(' 2. No library install needed - "Servo" is built into the Arduino IDE.'),
+            cmt(' 3. Select the board:  Tools -> Board -> Arduino AVR Boards -> "Arduino Uno".'),
+            cmt(' 4. Plug the Uno into USB, then pick the port:'),
+            cmt('      Tools -> Port -> (your COM / tty port).'),
+            cmt(' 5. Press Upload (the round right-arrow button). That flashes the Uno.'),
+            cmt('=========================================================================='),
+            ''
+        ].join('\n');
+
     let modeName = 'ASD Vectored (Vectored + Diff)';
     if (selectAlgorithm.value === 'differential') {
         modeName = 'ASD Differential (Longitudinal Only)';
@@ -2074,7 +2115,7 @@ function renderArduinoCode() {
         }
 
         code = `
-<span class="code-comment">// ASD Thruster Mixing System for Arduino Uno (AVR)</span>
+${setupGuide}<span class="code-comment">// ASD Thruster Mixing System for Arduino Uno (AVR)</span>
 <span class="code-comment">// Converts RC channels to 2 Azimuth Pods</span>
 <span class="code-comment">// Selected Mode: ${modeName}</span>
 
@@ -2165,7 +2206,7 @@ ${loopCode}
     } else {
         // ESP32 code using non-blocking interrupts and ESP32Servo library
         code = `
-<span class="code-comment">// ASD Thruster Mixing System for ESP32 (WROOM-32)</span>
+${setupGuide}<span class="code-comment">// ASD Thruster Mixing System for ESP32 (WROOM-32)</span>
 <span class="code-comment">// Converts ${is4ch ? '4' : '2'} RC channels to 2 Azimuth Pods</span>
 <span class="code-comment">// Uses high-precision hardware interrupts for non-blocking RC pulse reading</span>
 <span class="code-comment">// Selected Mode: ${modeName}</span>
