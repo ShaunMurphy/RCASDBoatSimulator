@@ -590,10 +590,16 @@
             <div class="panel-content" id="panelCode" style="display: none; padding: 15px; flex-direction: column; gap: 10px; height: 100%;">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Target Platform</span>
-                    <select id="selectPlatform" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 5px 10px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 11px; outline: none; cursor: pointer;">
-                        <option value="arduino">Arduino Uno (AVR)</option>
-                        <option value="esp32">ESP32 (WROOM-32)</option>
-                    </select>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="selectPlatform" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 5px 10px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 11px; outline: none; cursor: pointer;">
+                            <option value="esp32" selected>ESP32 (WROOM-32)</option>
+                            <option value="arduino">Arduino Uno (AVR)</option>
+                        </select>
+                        <button id="btnCopyCode" style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); color: var(--text-primary); padding: 5px 10px; border-radius: var(--radius-md); font-family: var(--font-sans); font-size: 11px; outline: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s;" title="Copy to Clipboard">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy
+                        </button>
+                    </div>
                 </div>
                 <div class="code-viewer" id="codeText" style="flex: 1; margin: 0; height: calc(100% - 30px);"></div>
             </div>
@@ -602,7 +608,7 @@
             <div class="panel-content" id="panelWiring" style="display: none; padding: 12px; flex-direction: column; gap: 10px; height: 100%; box-sizing: border-box;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
                     <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Interactive Wiring</span>
-                    <span id="wiringPlatformLabel" style="font-size: 10px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono);">ARDUINO UNO</span>
+                    <span id="wiringPlatformLabel" style="font-size: 10px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono);">ESP32 DEVKIT</span>
                 </div>
                 <div id="wiringDiagramContainer" style="flex: 1; background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-lg); position: relative; width: 100%; min-height: 420px; overflow: hidden; box-sizing: border-box;">
                     <!-- SVG Overlay -->
@@ -626,18 +632,18 @@
 
                     <!-- Microcontroller (center) -->
                     <div class="wiring-card" id="wiringMcu" style="position: absolute; top: 115px; left: 75px; width: 140px; z-index: 2;">
-                        <div class="wiring-card-title" id="wiringMcuTitle">Arduino Uno</div>
+                        <div class="wiring-card-title" id="wiringMcuTitle">ESP32 (WROOM-32)</div>
                         <!-- Inputs -->
-                        <div class="wiring-pin" id="pinMcuIn1"><span class="wiring-dot" id="dotMcuIn1"></span><span id="labelMcuIn1">D2 (CH1)</span></div>
-                        <div class="wiring-pin" id="pinMcuIn2"><span class="wiring-dot" id="dotMcuIn2"></span><span id="labelMcuIn2">D3 (CH2)</span></div>
-                        <div class="wiring-pin" id="pinMcuIn3" style="display: none;"><span class="wiring-dot" id="dotMcuIn3"></span><span id="labelMcuIn3">D4 (CH3)</span></div>
-                        <div class="wiring-pin" id="pinMcuIn4" style="display: none;"><span class="wiring-dot" id="dotMcuIn4"></span><span id="labelMcuIn4">D7 (CH4)</span></div>
+                        <div class="wiring-pin" id="pinMcuIn1"><span class="wiring-dot" id="dotMcuIn1"></span><span id="labelMcuIn1">GPIO23 (CH1)</span></div>
+                        <div class="wiring-pin" id="pinMcuIn2"><span class="wiring-dot" id="dotMcuIn2"></span><span id="labelMcuIn2">GPIO22 (CH2)</span></div>
+                        <div class="wiring-pin" id="pinMcuIn3" style="display: none;"><span class="wiring-dot" id="dotMcuIn3"></span><span id="labelMcuIn3">GPIO32 (CH3)</span></div>
+                        <div class="wiring-pin" id="pinMcuIn4" style="display: none;"><span class="wiring-dot" id="dotMcuIn4"></span><span id="labelMcuIn4">GPIO33 (CH4)</span></div>
                         <div style="height: 4px; border-bottom: 1px dashed rgba(255,255,255,0.05); margin: 2px 0;"></div>
                         <!-- Outputs -->
-                        <div class="wiring-pin" id="pinMcuOut1"><span id="labelMcuOut1">D9 (ServoL)</span><span class="wiring-dot" id="dotMcuOut1"></span></div>
-                        <div class="wiring-pin" id="pinMcuOut2"><span id="labelMcuOut2">D10 (ServoR)</span><span class="wiring-dot" id="dotMcuOut2"></span></div>
-                        <div class="wiring-pin" id="pinMcuOut3"><span id="labelMcuOut3">D5 (ESCL)</span><span class="wiring-dot" id="dotMcuOut3"></span></div>
-                        <div class="wiring-pin" id="pinMcuOut4"><span id="labelMcuOut4">D6 (ESCR)</span><span class="wiring-dot" id="dotMcuOut4"></span></div>
+                        <div class="wiring-pin" id="pinMcuOut1"><span id="labelMcuOut1">GPIO25 (ServoL)</span><span class="wiring-dot" id="dotMcuOut1"></span></div>
+                        <div class="wiring-pin" id="pinMcuOut2"><span id="labelMcuOut2">GPIO26 (ServoR)</span><span class="wiring-dot" id="dotMcuOut2"></span></div>
+                        <div class="wiring-pin" id="pinMcuOut3"><span id="labelMcuOut3">GPIO14 (ESCL)</span><span class="wiring-dot" id="dotMcuOut3"></span></div>
+                        <div class="wiring-pin" id="pinMcuOut4"><span id="labelMcuOut4">GPIO27 (ESCR)</span><span class="wiring-dot" id="dotMcuOut4"></span></div>
                     </div>
 
                     <!-- Left Pod Actuators (bottom-left) -->

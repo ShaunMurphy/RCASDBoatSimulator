@@ -662,6 +662,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     color: #a9b2c3;
     white-space: pre;
     height: 100%;
+    user-select: text; /* Allow code selection and copy */
 }
 
 .code-keyword { color: #ff7b72; }

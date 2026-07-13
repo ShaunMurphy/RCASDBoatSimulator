@@ -158,6 +158,7 @@ const panelCode = document.getElementById('panelCode');
 const panelWiring = document.getElementById('panelWiring');
 const selectPlatform = document.getElementById('selectPlatform');
 const codeText = document.getElementById('codeText');
+const btnCopyCode = document.getElementById('btnCopyCode');
 
 // Wiring diagram specific components
 const wiringPlatformLabel = document.getElementById('wiringPlatformLabel');
@@ -518,6 +519,24 @@ selectPlatform.addEventListener('change', () => {
         renderArduinoCode();
     }
 });
+
+if (btnCopyCode) {
+    btnCopyCode.addEventListener('click', () => {
+        if (!codeText) return;
+        const codeToCopy = codeText.innerText;
+        navigator.clipboard.writeText(codeToCopy).then(() => {
+            const origHtml = btnCopyCode.innerHTML;
+            btnCopyCode.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px; color: var(--accent-green);"><polyline points="20 6 9 17 4 12"></polyline></svg>Copied!`;
+            btnCopyCode.style.borderColor = 'var(--accent-green)';
+            setTimeout(() => {
+                btnCopyCode.innerHTML = origHtml;
+                btnCopyCode.style.borderColor = 'rgba(255,255,255,0.08)';
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy code: ', err);
+        });
+    });
+}
 
 selectChannelMode.addEventListener('change', () => {
     const val = selectChannelMode.value;
