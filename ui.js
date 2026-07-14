@@ -136,6 +136,8 @@ const slideShipRotDrag = document.getElementById('slideShipRotDrag');
 const valShipRotDrag = document.getElementById('valShipRotDrag');
 const slideRopeLength = document.getElementById('slideRopeLength');
 const valRopeLength = document.getElementById('valRopeLength');
+const slideFriction = document.getElementById('slideFriction');
+const valFriction = document.getElementById('valFriction');
 
 // Single Hand Controller Selectors
 const singleHandContainer = document.getElementById('singleHandContainer');
@@ -363,11 +365,13 @@ function applyConfig() {
         const sDrag = parseFloat(slideShipDrag.value);
         const sRotDrag = parseFloat(slideShipRotDrag.value);
         const rLen = parseFloat(slideRopeLength.value);
+        const fFriction = parseFloat(slideFriction.value);
 
         valShipMass.innerText = `${sMass} kg`;
         valShipDrag.innerText = `${sDrag}`;
         valShipRotDrag.innerText = `${sRotDrag}`;
         valRopeLength.innerText = `${rLen} m`;
+        valFriction.innerText = `${fFriction}`;
 
         boat.targetShip.config.mass = sMass;
         const L_ship = boat.targetShip.config.length;
@@ -379,6 +383,7 @@ function applyConfig() {
         boat.targetShip.config.dragAngular = sRotDrag;
         
         boat.config.towRopeLength = rLen;
+        boat.config.fenderFriction = fFriction;
     } else {
         boat.towLineAttached = false;
         if (btnTargetTowToggle) {
@@ -414,7 +419,8 @@ const sliders = [
     { el: slideShipMass, val: valShipMass, suffix: ' kg' },
     { el: slideShipDrag, val: valShipDrag, suffix: '' },
     { el: slideShipRotDrag, val: valShipRotDrag, suffix: '' },
-    { el: slideRopeLength, val: valRopeLength, suffix: ' m' }
+    { el: slideRopeLength, val: valRopeLength, suffix: ' m' },
+    { el: slideFriction, val: valFriction, suffix: '' }
 ];
 
 sliders.forEach(slider => {

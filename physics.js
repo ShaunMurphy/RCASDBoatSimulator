@@ -41,7 +41,9 @@ export class BoatPhysics {
             
             // Environment size
             pondSize: 50.0,       // meters (world coordinate boundaries: -25 to 25)
-            collisionRadius: 0.35 // meters (for boundary and dock collisions)
+            collisionRadius: 0.35, // meters (for boundary and dock collisions)
+            fenderFriction: 1.5,
+            towRopeLength: 1.6
         };
 
         this.targetShip = new TargetVessel();
@@ -455,7 +457,12 @@ export class BoatPhysics {
                 const velNormal = rvdX * nx + rvdY * ny;
                 
                 if (velNormal < 0) {
-                    const e = 0.15; // restitution
+                    const fFriction = this.config.fenderFriction !== undefined ? this.config.fenderFriction : 1.5;
+                    const stickLimitNormal = 0.25 * fFriction;
+                    const stickLimitTangent = 0.20 * fFriction;
+
+                    const normalSpeed = Math.abs(velNormal);
+                    const e = normalSpeed < stickLimitNormal ? 0.0 : 0.15; // inelastic for soft impacts in sticky range
                     
                     // Effective mass for rotation: 1/m_eff = 1/m + (r_perp^2)/I
                     // r_perp = r x n = r_x * n_y - r_y * n_x
@@ -466,23 +473,44 @@ export class BoatPhysics {
                     const invMassShip = 1.0 / mShip + (rnShip * rnShip) / ship.config.inertia;
                     
                     const impulse = -(1.0 + e) * velNormal / (invMassTug + invMassShip);
+
+                    // --- Tangential friction calculation ---
+                    const tx = -ny;
+                    const ty = nx;
+                    const velTangent = rvdX * tx + rvdY * ty;
+
+                    // Tangent perpendicular torque arms: r x t = r_x * t_y - r_y * t_x = r_x * n_x + r_y * n_y
+                    const rtTug = rxTug * nx + ryTug * ny;
+                    const rtShip = rxShip * nx + ryShip * ny;
+
+                    const invMassTugT = 1.0 / mTug + (rtTug * rtTug) / this.config.inertia;
+                    const invMassShipT = 1.0 / mShip + (rtShip * rtShip) / ship.config.inertia;
+
+                    const impulseT_max = -velTangent / (invMassTugT + invMassShipT);
+
+                    // Dynamic friction determination
+                    let mu = 0.15; // sliding friction
+                    if (normalSpeed < stickLimitNormal && Math.abs(velTangent) < stickLimitTangent) {
+                        mu = fFriction; // sticky static friction
+                    }
+
+                    const maxFrictionImpulse = mu * impulse;
+                    const impulseT = Math.max(-maxFrictionImpulse, Math.min(impulseT_max, maxFrictionImpulse));
                     
-                    // Apply linear velocity changes
-                    this.state.vx += nx * (impulse / mTug);
-                    this.state.vy += ny * (impulse / mTug);
-                    ship.state.vx -= nx * (impulse / mShip);
-                    ship.state.vy -= ny * (impulse / mShip);
+                    // Apply linear velocity changes (Normal + Tangent)
+                    this.state.vx += nx * (impulse / mTug) + tx * (impulseT / mTug);
+                    this.state.vy += ny * (impulse / mTug) + ty * (impulseT / mTug);
+                    ship.state.vx -= nx * (impulse / mShip) + tx * (impulseT / mShip);
+                    ship.state.vy -= ny * (impulse / mShip) + ty * (impulseT / mShip);
                     
                     // Apply angular velocity changes
-                    // Force on ship is -nx * impulse, -ny * impulse
-                    const FxShip = -nx * impulse;
-                    const FyShip = -ny * impulse;
+                    const FxShip = -(nx * impulse + tx * impulseT);
+                    const FyShip = -(ny * impulse + ty * impulseT);
                     const torqueShip = ryShip * FxShip - rxShip * FyShip;
                     ship.state.omega += torqueShip / ship.config.inertia;
                     
-                    // Force on tug is +nx * impulse, +ny * impulse
-                    const FxTug = nx * impulse;
-                    const FyTug = ny * impulse;
+                    const FxTug = nx * impulse + tx * impulseT;
+                    const FyTug = ny * impulse + ty * impulseT;
                     const torqueTug = ryTug * FxTug - rxTug * FyTug;
                     this.state.omega += torqueTug / this.config.inertia;
                 }
